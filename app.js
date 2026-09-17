@@ -1,33 +1,636 @@
-const store={get:(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))??fallback}catch{return fallback}},set:(key,value)=>localStorage.setItem(key,JSON.stringify(value))};
+
+const DATA=window.APP_DATA;
+const store={get:(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set:(k,v)=>localStorage.setItem(k,JSON.stringify(v))};
+const localISO=(date=new Date())=>{const y=date.getFullYear(),m=String(date.getMonth()+1).padStart(2,'0'),d=String(date.getDate()).padStart(2,'0');return `${y}-${m}-${d}`};
+let state={tab:'home',date:localISO(),nutritionDate:store.get('nutritionDate',localISO()),planningDate:store.get('planningDate',localISO()),week:1,choices:store.get('choices',{}),shopping:store.get('shopping',[]),chat:store.get('chat',[]),profile:store.get('profile',{name:'Klant',weight:82,height:180,target:80}),weights:store.get('weights',[84.6,84.1,83.7,83.2,82.8,82.4,82]),checkInPrefs:store.get('checkInPrefs',{weight:true,photos:true,skinfold:true}),checkInTab:store.get('checkInTab','weight'),macroPlan:store.get('macroPlan',{carbs:300,protein:150,fat:80}),nutritionMode:store.get('nutritionMode','self'),activeMeal:store.get('activeMeal',null),foodLog:store.get('foodLog',[]),activeClientId:store.get('activeClientId','sophie'),coachClientId:store.get('coachClientId','sophie'),productRetailer:store.get('productRetailer','Albert Heijn'),productResults:[],productLoading:false,labGroup:store.get('labGroup','attention'),scheduleCompletions:store.get('scheduleCompletions',{}),sleepLog:store.get('sleepLog',{})};
+const FOOD_DB=[
+  {id:'havermout',name:'Havermout',kcal:372,carbs:59.1,protein:13.5,fat:7},
+  {id:'kwark',name:'Magere kwark',kcal:59,carbs:4,protein:10,fat:.2},
+  {id:'banaan',name:'Banaan',kcal:89,carbs:22.8,protein:1.1,fat:.3},
+  {id:'rijst',name:'Witte rijst, gekookt',kcal:130,carbs:28.2,protein:2.7,fat:.3},
+  {id:'kip',name:'Kipfilet, bereid',kcal:165,carbs:0,protein:31,fat:3.6},
+  {id:'zalm',name:'Zalm, bereid',kcal:208,carbs:0,protein:20,fat:13},
+  {id:'ei',name:'Ei',kcal:143,carbs:.7,protein:12.6,fat:9.5},
+  {id:'brood',name:'Volkorenbrood',kcal:247,carbs:41,protein:13,fat:4.2},
+  {id:'pindakaas',name:'Pindakaas',kcal:588,carbs:20,protein:25,fat:50},
+  {id:'aardappel',name:'Aardappel, gekookt',kcal:87,carbs:20,protein:1.9,fat:.1},
+  {id:'avocado',name:'Avocado',kcal:160,carbs:8.5,protein:2,fat:14.7},
+  {id:'olijfolie',name:'Olijfolie',kcal:884,carbs:0,protein:0,fat:100},
+  {id:'whey',name:'Whey eiwitpoeder',kcal:390,carbs:7,protein:78,fat:6},
+  {id:'pure-chocolade',name:'Pure chocolade 70%',kcal:598,carbs:46,protein:7.8,fat:43},
+  {id:'melk',name:'Halfvolle melk',kcal:47,carbs:4.7,protein:3.5,fat:1.5},
+  {id:'griekse-yoghurt',name:'Griekse yoghurt 0%',kcal:59,carbs:3.6,protein:10.3,fat:.4},
+  {id:'muesli',name:'Muesli',kcal:370,carbs:64,protein:10,fat:7},
+  {id:'volkoren-pasta',name:'Volkoren pasta, gekookt',kcal:149,carbs:27,protein:5.8,fat:1.4},
+  {id:'rundergehakt',name:'Mager rundergehakt, bereid',kcal:215,carbs:0,protein:26,fat:12},
+  {id:'tofu',name:'Tofu',kcal:144,carbs:2.8,protein:17,fat:8.7},
+  {id:'broccoli',name:'Broccoli, gekookt',kcal:35,carbs:2,protein:3.6,fat:.4},
+  {id:'appel',name:'Appel',kcal:52,carbs:14,protein:.3,fat:.2}
+];
+const LAB_RESULTS=[
+  {group:'Bloedbeeld',name:'Leucocyten',value:'6.2',unit:'/nl',reference:'4.2 – 9.1',status:'ok'},
+  {group:'Bloedbeeld',name:'Erytrocyten',value:'5.7',unit:'/pl',reference:'4.6 – 6.1',status:'ok'},
+  {group:'Bloedbeeld',name:'Hemoglobine',value:'10.5',unit:'mmol/l',reference:'8.5 – 10.9',status:'ok'},
+  {group:'Bloedbeeld',name:'Hematocriet',value:'0.60',unit:'l/l',reference:'0.41 – 0.52',status:'high'},
+  {group:'Bloedbeeld',name:'MCV',value:'104.5',unit:'fl',reference:'82 – 98',status:'high'},
+  {group:'Bloedbeeld',name:'MCH',value:'1.84',unit:'fmol/l',reference:'1.59 – 2.00',status:'ok'},
+  {group:'Bloedbeeld',name:'MCHC',value:'17.6',unit:'mmol/l',reference:'19.0 – 22.5',status:'low'},
+  {group:'Bloedbeeld',name:'RDW-CV',value:'13.0',unit:'%',reference:'11.0 – 16.0',status:'ok'},
+  {group:'Bloedbeeld',name:'Trombocyten',value:'223',unit:'/nl',reference:'150 – 400',status:'ok'},
+  {group:'Hart & vaten',name:'Totaal cholesterol',value:'3.96',unit:'mmol/l',reference:'< 5.18',status:'ok'},
+  {group:'Hart & vaten',name:'HDL-cholesterol',value:'0.80',unit:'mmol/l',reference:'0.91 – 2.07',status:'low'},
+  {group:'Hart & vaten',name:'Cholesterol/HDL',value:'4.9',unit:'ratio',reference:'2–5: middelhoog volgens rapport',status:'context'},
+  {group:'Hart & vaten',name:'LDL-cholesterol',value:'2.18',unit:'mmol/l',reference:'< 3.37',status:'ok'},
+  {group:'Hart & vaten',name:'LDL/HDL-index',value:'2.7',unit:'ratio',reference:'< 2.5: laag risico volgens rapport',status:'context'},
+  {group:'Hart & vaten',name:'Non-HDL-cholesterol',value:'3.16',unit:'mmol/l',reference:'Geen los doel in rapport',status:'context'},
+  {group:'Hart & vaten',name:'Triglyceriden',value:'2.33',unit:'mmol/l',reference:'< 2.28',status:'high'},
+  {group:'Lever & nieren',name:'ASAT',value:'49',unit:'U/l',reference:'< 50',status:'ok'},
+  {group:'Lever & nieren',name:'ALAT',value:'47',unit:'U/l',reference:'< 50',status:'ok'},
+  {group:'Lever & nieren',name:'Gamma-GT',value:'22',unit:'U/l',reference:'< 60',status:'ok'},
+  {group:'Lever & nieren',name:'Creatinine',value:'93.7',unit:'µmol/l',reference:'59.2 – 103.4',status:'ok'},
+  {group:'Lever & nieren',name:'eGFR (CKD-EPI)',value:'97.7',unit:'ml/min/1.73m²',reference:'≥ 60',status:'ok'},
+  {group:'Eiwitten',name:'Albumine',value:'49.1',unit:'g/l',reference:'35.0 – 52.0',status:'ok'},
+  {group:'Hormonen',name:'LH',value:'<0.3',unit:'IU/l',reference:'1.7 – 8.6',status:'low'},
+  {group:'Hormonen',name:'FSH',value:'<0.3',unit:'IU/l',reference:'1.5 – 12.4',status:'low'},
+  {group:'Hormonen',name:'Testosteron totaal',value:'102.00',unit:'nmol/l',reference:'8.64 – 29.00',status:'high'},
+  {group:'Hormonen',name:'Testosteron vrij',value:'3.315',unit:'nmol/l',reference:'> 0.125 (alleen ondergrens)',status:'context'},
+  {group:'Hormonen',name:'SHBG',value:'18.3',unit:'nmol/l',reference:'18.3 – 54.1',status:'ok'}
+];
+const DEFAULT_LAB_REPORT={id:'report-2026-05-13',date:'2026-05-13',label:'Labrapport 13 mei 2026',source:'Eerste rapport',results:LAB_RESULTS};
+state.labReports=store.get('labReports',[DEFAULT_LAB_REPORT]);
+state.activeLabReportId=store.get('activeLabReportId',state.labReports.at(-1)?.id||DEFAULT_LAB_REPORT.id);
+state.labMetric=store.get('labMetric','Hematocriet');
+state.labDraft=null;
+state.labUploadBusy=false;
 const CLIENTS=[{id:'sophie',name:'Sophie de Vries',goal:'Sterker worden'},{id:'daan',name:'Daan Jansen',goal:'Vetverlies'},{id:'mila',name:'Mila Bakker',goal:'Conditie opbouwen'}];
-const DAYS=['Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag','Zondag'];
-const MEALS=[['breakfast','Ontbijt'],['snack1','Snack 1'],['lunch','Lunch'],['snack2','Snack 2'],['dinner','Avondeten'],['snack3','Snack 3']];
-const BASE_SCHEDULE=[{type:'Training',title:'Full body kracht',note:'60 minuten'},{type:'Rust',title:'Rustdag',note:'Herstel'},{type:'Training',title:'Upper body',note:'50 minuten'},{type:'Herstel',title:'Mobiliteit',note:'20 minuten'},{type:'Training',title:'Full body kracht',note:'60 minuten'},{type:'Conditie',title:'Zone 2 cardio',note:'35 minuten'},{type:'Rust',title:'Rustdag',note:'Herstel'}];
-const DEFAULT_PLAN={id:'performance-basis',title:'Performance Basis',description:'Persoonlijk krachtplan.',sessions:[{day:'Maandag',title:'Lower body strength',exercises:[{name:'Back squat',sets:4,reps:'6',method:'normal'}]},{day:'Woensdag',title:'Upper body strength',exercises:[{name:'Bench press',sets:4,reps:'6',method:'cluster'}]}]};
-let state={view:'nutrition',clientId:store.get('coachClientId','sophie'),nutrition:store.get('coachNutritionPlans',{}),schedules:store.get('coachSchedules',{}),goals:store.get('coachGoals',{}),plans:store.get('trainingPlans',[DEFAULT_PLAN]),assignments:store.get('clientPlanAssignments',{})};
-const $=selector=>document.querySelector(selector),esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-function toast(message){const el=$('#toast');el.textContent=message;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),1800)}
-function client(){return CLIENTS.find(x=>x.id===state.clientId)||CLIENTS[0]}
-function nutritionPlan(){return state.nutrition[state.clientId]||{carbs:300,protein:150,fat:80,note:'Verdeel je voeding over zes eetmomenten.',meals:{}}}
-function renderNutrition(){const p=nutritionPlan(),kcal=p.carbs*4+p.protein*4+p.fat*9;return `<div class="intro"><div><span class="label">Voedingscoaching</span><h2>Voedingsplan voor ${esc(client().name)}</h2><p>Stel de dagelijkse macro's en instructies per eetmoment in. De klant kan deze doelen alleen bekijken.</p></div><span class="pill">Coach bepaalt</span></div><section class="card"><span class="label">Dagdoel</span><h3>Macro's per dag</h3><div class="macro-grid"><div class="field"><label>Koolhydraten (g)</label><input id="carbs" type="number" value="${p.carbs}" oninput="updateKcal()"><small>4 kcal per gram</small></div><div class="field"><label>Eiwit (g)</label><input id="protein" type="number" value="${p.protein}" oninput="updateKcal()"><small>4 kcal per gram</small></div><div class="field"><label>Vet (g)</label><input id="fat" type="number" value="${p.fat}" oninput="updateKcal()"><small>9 kcal per gram</small></div><div class="kcal-preview" id="kcal">${kcal.toLocaleString('nl-NL')} kcal</div></div><div class="field" style="margin-top:12px"><label>Algemene instructie voor de klant</label><textarea id="note" rows="3">${esc(p.note||'')}</textarea></div></section><section class="card"><span class="label">Eetmomenten</span><h3>Richtlijn per maaltijd</h3><div class="meal-guidance">${MEALS.map(([id,label])=>`<div><label>${label}</label><input id="meal-${id}" value="${esc(p.meals?.[id]||'')}" placeholder="Bijv. eiwitrijk en 60 g koolhydraten"></div>`).join('')}</div><div class="actions"><button onclick="saveNutrition()">Voedingsplan opslaan</button></div></section>`}
-function updateKcal(){const c=+$(`#carbs`).value||0,p=+$(`#protein`).value||0,f=+$(`#fat`).value||0;$('#kcal').textContent=`${Math.round(c*4+p*4+f*9).toLocaleString('nl-NL')} kcal`}
-function saveNutrition(){const meals=Object.fromEntries(MEALS.map(([id])=>[id,$(`#meal-${id}`).value.trim()]));state.nutrition[state.clientId]={carbs:Math.max(0,+$('#carbs').value||0),protein:Math.max(0,+$('#protein').value||0),fat:Math.max(0,+$('#fat').value||0),note:$('#note').value.trim(),meals};store.set('coachNutritionPlans',state.nutrition);toast('Voedingsplan opgeslagen voor '+client().name)}
-function schedule(){return state.schedules[state.clientId]||BASE_SCHEDULE}
-function renderPlanning(){const plan=schedule();return `<div class="intro"><div><span class="label">Weekplanning</span><h2>Planning voor ${esc(client().name)}</h2><p>Deze onderdelen verschijnen per dag in de klantenapp.</p></div></div><section class="card"><div class="schedule">${plan.map((day,i)=>`<div class="schedule-row"><b>${DAYS[i]}</b><select id="type-${i}">${['Training','Rust','Herstel','Conditie'].map(x=>`<option ${x===day.type?'selected':''}>${x}</option>`).join('')}</select><input id="title-${i}" value="${esc(day.title)}"><input id="note-${i}" value="${esc(day.note)}"></div>`).join('')}</div><div class="actions"><button onclick="savePlanning()">Weekplanning opslaan</button></div></section>`}
-function savePlanning(){state.schedules[state.clientId]=DAYS.map((_,i)=>({type:$(`#type-${i}`).value,title:$(`#title-${i}`).value.trim(),note:$(`#note-${i}`).value.trim()}));store.set('coachSchedules',state.schedules);toast('Planning opgeslagen voor '+client().name)}
-function goals(){return state.goals[state.clientId]||[]}
-function renderGoals(){const list=goals();return `<div class="intro"><div><span class="label">Weekdoelen</span><h2>Doelen voor ${esc(client().name)}</h2><p>Stel concrete doelen in die boven de weekplanning van de klant verschijnen.</p></div></div><section class="card"><h3>Nieuw doel</h3><div class="goal-form"><select id="goalPreset" onchange="applyGoalPreset(this.value)"><option value="sleep">8 uur slaap</option><option value="training">4 trainingen per week</option><option value="steps">10.000 stappen per dag</option><option value="water">2 liter water per dag</option><option value="custom">Eigen doel</option></select><input id="goalTitle" value="Gemiddeld 8 uur slapen" placeholder="Naam doel"><input id="goalTarget" type="number" step="0.5" value="8" placeholder="Doel"><input id="goalUnit" value="uur" placeholder="Eenheid"><input id="goalPeriod" value="per nacht" placeholder="Periode"><button onclick="addGoal()">Toevoegen</button></div></section><section class="card"><h3>Actieve doelen</h3><div class="goal-list">${list.length?list.map(g=>`<article><div><b>${esc(g.title)}</b><span>${g.target} ${esc(g.unit)} · ${esc(g.period||'deze week')}</span></div><button onclick="removeGoal('${g.id}')" aria-label="Verwijder doel">×</button></article>`).join(''):'<p class="empty">Nog geen doelen ingesteld.</p>'}</div></section>`}
-function applyGoalPreset(value){const presets={sleep:['Gemiddeld 8 uur slapen',8,'uur','per nacht'],training:['4 trainingen afronden',4,'trainingen','deze week'],steps:['10.000 stappen per dag',7,'dagen','deze week'],water:['2 liter water per dag',7,'dagen','deze week'],custom:['Eigen doel',1,'keer','deze week']},p=presets[value]||presets.custom;$('#goalTitle').value=p[0];$('#goalTarget').value=p[1];$('#goalUnit').value=p[2];$('#goalPeriod').value=p[3]}
-function addGoal(){const title=$('#goalTitle').value.trim(),target=Math.max(.5,+$('#goalTarget').value||0),unit=$('#goalUnit').value.trim(),period=$('#goalPeriod').value.trim();if(!title||!unit||!target)return toast('Vul het doel volledig in');state.goals[state.clientId]=[...goals(),{id:`goal-${Date.now()}`,type:$('#goalPreset').value,title,target,unit,period,current:0}];store.set('coachGoals',state.goals);render();toast('Doel toegevoegd voor '+client().name)}
-function removeGoal(id){state.goals[state.clientId]=goals().filter(g=>g.id!==id);store.set('coachGoals',state.goals);render();toast('Doel verwijderd')}
-function assignedPlan(){const id=state.assignments[state.clientId],plan=state.plans.find(x=>x.id===id);return plan||state.plans[0]||DEFAULT_PLAN}
-function renderTraining(){const plan=assignedPlan();return `<div class="intro"><div><span class="label">Trainingsschema</span><h2>Schema voor ${esc(client().name)}</h2><p>Maak oefeningen, supersets en clustersets en wijs het schema aan één of meerdere klanten toe.</p></div><button class="new-plan" onclick="createPlan()">＋ Nieuw schema</button></div><section class="card"><div class="field"><label>Naam schema</label><input id="planTitle" value="${esc(plan.title)}"></div><div class="field" style="margin-top:8px"><label>Omschrijving</label><input id="planDescription" value="${esc(plan.description)}"></div></section><div class="sessions">${plan.sessions.map((session,si)=>`<section class="card session"><div class="session-head"><select id="sessionDay-${si}">${DAYS.map(day=>`<option ${day===session.day?'selected':''}>${day}</option>`).join('')}</select><input id="sessionTitle-${si}" value="${esc(session.title)}"></div><div id="exercises-${si}">${session.exercises.map((exercise,ei)=>exerciseRow(si,ei,exercise)).join('')}</div><button class="add" onclick="addExercise(${si})">＋ Oefening toevoegen</button></section>`).join('')}</div><section class="card"><h3>Toewijzen aan klanten</h3><div class="client-checks">${CLIENTS.map(c=>`<label><input type="checkbox" data-assign="${c.id}" ${state.assignments[c.id]===plan.id?'checked':''}><span><b>${esc(c.name)}</b><small>${esc(c.goal)}</small></span></label>`).join('')}</div></section><div class="actions"><button onclick="saveTraining()">Schema opslaan en toewijzen</button></div>`}
-function exerciseRow(si,ei,e){return `<div class="exercise" data-exercise="${si}-${ei}"><input value="${esc(e.name)}" aria-label="Oefening"><input type="number" value="${e.sets}" aria-label="Sets"><input value="${esc(e.reps)}" aria-label="Herhalingen"><select><option value="normal" ${e.method==='normal'?'selected':''}>Normale sets</option><option value="superset-a" ${e.method==='superset-a'?'selected':''}>Superset A</option><option value="superset-b" ${e.method==='superset-b'?'selected':''}>Superset B</option><option value="cluster" ${e.method==='cluster'?'selected':''}>Cluster 6×6 · 10 sec</option></select><button onclick="removeExercise(${si},${ei})">×</button></div>`}
-function collectTraining(){const plan=assignedPlan();plan.title=$('#planTitle').value.trim();plan.description=$('#planDescription').value.trim();plan.sessions=plan.sessions.map((session,si)=>({...session,day:$(`#sessionDay-${si}`).value,title:$(`#sessionTitle-${si}`).value.trim(),exercises:[...document.querySelectorAll(`[data-exercise^="${si}-"]`)].map(row=>{const fields=row.querySelectorAll('input,select');return{name:fields[0].value,sets:+fields[1].value||3,reps:fields[2].value,method:fields[3].value}})}));return plan}
-function addExercise(si){const plan=collectTraining();plan.sessions[si].exercises.push({name:'Nieuwe oefening',sets:3,reps:'10',method:'normal'});render()}
-function removeExercise(si,ei){const plan=collectTraining();plan.sessions[si].exercises.splice(ei,1);render()}
-function createPlan(){const plan={id:`plan-${Date.now()}`,title:'Nieuw trainingsschema',description:'Persoonlijk schema.',sessions:[{day:'Maandag',title:'Training 1',exercises:[{name:'Nieuwe oefening',sets:3,reps:'10',method:'normal'}]}]};state.plans.push(plan);state.assignments[state.clientId]=plan.id;render()}
-function saveTraining(){const plan=collectTraining();if(!state.plans.some(x=>x.id===plan.id))state.plans.push(plan);document.querySelectorAll('[data-assign]').forEach(cb=>{const id=cb.dataset.assign;if(cb.checked)state.assignments[id]=plan.id;else if(state.assignments[id]===plan.id)delete state.assignments[id]});store.set('trainingPlans',state.plans);store.set('clientPlanAssignments',state.assignments);toast('Trainingsschema opgeslagen en toegewezen')}
-function render(){const titles={nutrition:'Voedingsplan',planning:'Weekplanning',goals:'Doelen',training:'Trainingsschema’s'};$('#title').textContent=titles[state.view];$('#view').innerHTML=state.view==='nutrition'?renderNutrition():state.view==='planning'?renderPlanning():state.view==='goals'?renderGoals():renderTraining();document.querySelectorAll('nav button').forEach(button=>button.classList.toggle('active',button.dataset.view===state.view))}
-function init(){const select=$('#clientSelect');select.innerHTML=CLIENTS.map(c=>`<option value="${c.id}" ${c.id===state.clientId?'selected':''}>${esc(c.name)} · ${esc(c.goal)}</option>`).join('');select.onchange=()=>{state.clientId=select.value;store.set('coachClientId',state.clientId);render()};document.querySelectorAll('nav button').forEach(button=>button.onclick=()=>{state.view=button.dataset.view;render()});render()}
-init();
+const WEEK_DAYS=['Maandag','Dinsdag','Woensdag','Donderdag','Vrijdag','Zaterdag','Zondag'];
+const MEAL_SLOTS=[{id:'breakfast',label:'Ontbijt',icon:'☀'},{id:'snack1',label:'Snack 1',icon:'·'},{id:'lunch',label:'Lunch',icon:'◐'},{id:'snack2',label:'Snack 2',icon:'·'},{id:'dinner',label:'Avondeten',icon:'☾'},{id:'snack3',label:'Snack 3',icon:'·'}];
+state.nutritionView=store.get('nutritionView','diary');
+state.productTargetMeal=store.get('productTargetMeal','breakfast');
+state.customRecipes=store.get('customRecipes',[]);
+state.coachNutritionPlans=store.get('coachNutritionPlans',{});
+const BASE_SCHEDULE=[
+  {type:'Training',title:'Full body kracht',note:'60 minuten · focus onderlichaam'},
+  {type:'Rust',title:'Rustdag',note:'Herstel en voldoende slaap'},
+  {type:'Training',title:'Upper body',note:'50 minuten · techniek'},
+  {type:'Herstel',title:'Mobiliteit',note:'20 minuten rustig bewegen'},
+  {type:'Training',title:'Full body kracht',note:'60 minuten · progressie'},
+  {type:'Conditie',title:'Zone 2 cardio',note:'35 minuten'},
+  {type:'Rust',title:'Rustdag',note:'Voorbereiden op nieuwe week'}
+];
+state.coachSchedules=store.get('coachSchedules',Object.fromEntries(CLIENTS.map((c,ci)=>[c.id,BASE_SCHEDULE.map((d,i)=>({...d,title:ci===0?d.title:i%2===0?'Persoonlijke training':d.title}))])));
+const DEFAULT_CLIENT_GOALS={
+  sophie:[{id:'sleep-8',type:'sleep',title:'Gemiddeld 8 uur slapen',target:8,unit:'uur',period:'per nacht'},{id:'training-4',type:'training',title:'4 trainingen afronden',target:4,unit:'trainingen',period:'deze week'}],
+  daan:[{id:'training-4',type:'training',title:'4 trainingen afronden',target:4,unit:'trainingen',period:'deze week'}],
+  mila:[{id:'steps-10k',type:'custom',title:'10.000 stappen per dag',target:7,unit:'dagen',period:'deze week',current:3}]
+};
+state.coachGoals=store.get('coachGoals',DEFAULT_CLIENT_GOALS);
+state.weightEntries=store.get('weightEntries',state.weights.map((weight,i)=>{const date=new Date();date.setDate(date.getDate()-(state.weights.length-1-i)*7);return{id:i+1,date:localISO(date),weight}}));
+const DEFAULT_TRAINING_PLAN={id:'performance-basis',title:'Performance Basis',description:'Persoonlijk krachtplan met vier trainingsmomenten.',sessions:[
+  {day:'Maandag',title:'Lower body strength',exercises:[{name:'Back squat',sets:4,reps:'6',method:'normal'},{name:'Romanian deadlift',sets:3,reps:'8',method:'superset-a'},{name:'Leg curl',sets:3,reps:'10',method:'superset-a'}]},
+  {day:'Woensdag',title:'Upper body strength',exercises:[{name:'Bench press',sets:4,reps:'6',method:'cluster'},{name:'Chest-supported row',sets:4,reps:'8',method:'superset-a'},{name:'Incline dumbbell press',sets:4,reps:'10',method:'superset-a'}]},
+  {day:'Vrijdag',title:'Full body hypertrophy',exercises:[{name:'Hack squat',sets:6,reps:'6',method:'cluster'},{name:'Lat pulldown',sets:3,reps:'10',method:'superset-a'},{name:'Lateral raise',sets:3,reps:'15',method:'superset-a'}]},
+  {day:'Zaterdag',title:'Conditioning & core',exercises:[{name:'Bike intervals',sets:8,reps:'30 sec',method:'normal'},{name:'Hanging knee raise',sets:3,reps:'12',method:'superset-a'},{name:'Pallof press',sets:3,reps:'12',method:'superset-a'}]}
+]};
+state.trainingPlans=store.get('trainingPlans',[DEFAULT_TRAINING_PLAN]);
+state.clientPlanAssignments=store.get('clientPlanAssignments',{sophie:'performance-basis',daan:'performance-basis'});
+state.editingPlanId=state.trainingPlans[0]?.id||null;
+state.coachPortalTab=store.get('coachPortalTab','schedule');
+state.planSessionIdx=null;
+const $=s=>document.querySelector(s), esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const planner=DATA.planner; if(!planner.some(d=>d.date===state.date))state.date=planner[0].date;
+const day=()=>planner.find(d=>d.date===state.date)||planner[0];
+const fmt=d=>new Date(d+'T12:00:00').toLocaleDateString('nl-NL',{weekday:'long',day:'numeric',month:'long'});
+const key=(m)=>state.date+'-'+m;
+function toast(t){let e=$('#toast');e.textContent=t;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),1800)}
+function optionsFor(daytype,moment){let xs=DATA.mealOptions.filter(x=>x.daytype===daytype);return xs.find(x=>x.moment.toLowerCase().includes(moment))||xs[0]}
+const pics={havermout:'https://images.unsplash.com/photo-1517673132405-a56a62b18caf?auto=format&fit=crop&w=300&q=80',kwark:'https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=300&q=80',brood:'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=300&q=80',wrap:'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?auto=format&fit=crop&w=300&q=80',rijst:'https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=300&q=80',pasta:'https://images.unsplash.com/photo-1473093295043-cdd812d0e601?auto=format&fit=crop&w=300&q=80',banaan:'https://images.unsplash.com/photo-1528825871115-3581a5387919?auto=format&fit=crop&w=300&q=80',fruit:'https://images.unsplash.com/photo-1610832958506-aa56368176cf?auto=format&fit=crop&w=300&q=80',noten:'https://images.unsplash.com/photo-1599599810694-b5b37304c041?auto=format&fit=crop&w=300&q=80',shake:'https://images.unsplash.com/photo-1553530666-ba11a7da3888?auto=format&fit=crop&w=300&q=80',default:'https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=300&q=80'};
+function pic(s){s=s.toLowerCase();for(const k in pics)if(s.includes(k))return pics[k];return pics.default}
+const mealPhotoRules=[[/havermout|oat/,'https://images.unsplash.com/photo-1517673132405-a56a62b18caf?auto=format&fit=crop&w=700&q=85'],[/kwark|skyr|yoghurt|drinkyoghurt/,'https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=700&q=85'],[/granola|muesli|cornflakes/,'https://images.unsplash.com/photo-1511690743698-d9d85f2fbf38?auto=format&fit=crop&w=700&q=85'],[/omelet|\bei\b|eieren/,'https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=700&q=85'],[/bagel/,'https://images.unsplash.com/photo-1585445490387-f47934b73b54?auto=format&fit=crop&w=700&q=85'],[/boterham|brood|krentenbol|broodje/,'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=700&q=85'],[/wrap|fajita/,'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?auto=format&fit=crop&w=700&q=85'],[/pasta|gnocchi|spaghetti/,'https://images.unsplash.com/photo-1473093295043-cdd812d0e601?auto=format&fit=crop&w=700&q=85'],[/rijst|rice|bowl/,'https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=700&q=85'],[/quinoa|couscous|salade/,'https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=700&q=85'],[/aardappel|puree/,'https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&w=700&q=85'],[/zalm|tonijn|vis/,'https://images.unsplash.com/photo-1467003909585-2f8a72700288?auto=format&fit=crop&w=700&q=85'],[/kip|chicken/,'https://images.unsplash.com/photo-1532550907401-a500c9a57435?auto=format&fit=crop&w=700&q=85'],[/tofu|vegetar/,'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=700&q=85'],[/smoothie|shake|hersteldrank|chocolademelk|warme melk|sportdrank/,'https://images.unsplash.com/photo-1553530666-ba11a7da3888?auto=format&fit=crop&w=700&q=85'],[/banaan/,'https://images.unsplash.com/photo-1528825871115-3581a5387919?auto=format&fit=crop&w=700&q=85'],[/fruit|appel|rood fruit/,'https://images.unsplash.com/photo-1610832958506-aa56368176cf?auto=format&fit=crop&w=700&q=85'],[/noten|pindakaas/,'https://images.unsplash.com/photo-1599599810694-b5b37304c041?auto=format&fit=crop&w=700&q=85'],[/rijstwafel|mueslireep|energiereep|chews|gel/,'https://images.unsplash.com/photo-1579722821273-0f6c1ddde163?auto=format&fit=crop&w=700&q=85']];
+function mealImage(option,moment=''){const text=String(option||'').toLowerCase();if(state&&state.recipeDb&&state.recipeDb.length){const words=text.replace(/\b\d+[–-]?\d*\s*(g|ml|el|tl|min|personen|kh|uur)\b/g,' ').split(/[^a-zà-ÿ]+/).filter(w=>w.length>4&&!['kies','recept','grote','runner','addon'].includes(w));let best=null,bestScore=0;for(const r of state.recipeDb){const hay=(r.name+' '+r.ingredients.join(' ')).toLowerCase();const score=words.reduce((n,w)=>n+(hay.includes(w)?1:0),0);if(score>bestScore){best=r;bestScore=score}}if(best&&bestScore>=2)return best.photo}for(const [rx,url] of mealPhotoRules)if(rx.test(text))return url;return moment==='breakfast'?DATA.photos.breakfast:moment==='lunch'?DATA.photos.lunch:moment==='snack'?DATA.photos.snack:pics.default}
+function selectedMacros(){let base={cal:Math.round(state.macroPlan.carbs*4+state.macroPlan.protein*4+state.macroPlan.fat*9),carbs:state.macroPlan.carbs,protein:state.macroPlan.protein,fat:state.macroPlan.fat};let count=['breakfast','lunch','snack','dinnerRecipe'].filter(m=>state.choices[key(m)]!=null).length;let ratio=count/4;return {...base,eaten:Math.round(base.cal*ratio),ratio}}
+function mealSection(title,moment,row,sub){if(!row)return'';let chosen=state.choices[key(moment)];return `<section><div class="section-head"><div><h2>${title}</h2><p>${sub||'Kies één optie'} · tik nogmaals om te deselecteren</p></div><button class="add-btn" aria-label="Selectie wissen" onclick="clearMeal('${moment}')">×</button></div><div class="meal-card">${row.options.map((o,i)=>`<div class="meal-option ${chosen===i?'selected':''}" onclick="chooseMeal('${moment}',${i})"><img src="${mealImage(o,moment)}" alt="Foto van ${esc(o.split('•')[0])}" loading="lazy"><div><h4>${esc(o.split('•')[0])}</h4><p>${esc(o)}</p></div><span class="check">${chosen===i?'✓':''}</span></div>`).join('')}</div></section>`}
+function diary(){let d=day(),m=selectedMacros(d),b=optionsFor(d.daytype,'ontbijt'),l=optionsFor(d.daytype,'lunch'),s=optionsFor(d.daytype,'snack')||optionsFor(d.daytype,'tussendoor');let dinnerOpts=d.dinners.map(code=>{let r=DATA.recipes.find(x=>x.code===code);return r?`${r.name} • ${r.time} • voor 2 personen`:code});return `<div class="hero"><div class="hero-row"><input class="date-control" type="date" value="${d.date}" min="${planner[0].date}" max="${planner.at(-1).date}" onchange="changeDate(this.value)"><span class="training-chip">${esc(d.training)}</span></div><div class="remaining">Je kunt nog <strong>${Math.max(0,m.cal-m.eaten).toLocaleString('nl-NL')}</strong> calorieën eten</div><div class="progress"><i style="width:${m.ratio*100}%"></i></div><div class="progress-label"><span>${m.eaten.toLocaleString('nl-NL')} gegeten</span><span>Doel: ${m.cal.toLocaleString('nl-NL')}</span></div></div><div class="macro-grid">${macro('Koolhydraten',Math.round(m.carbs*m.ratio),m.carbs,'var(--pink)')}${macro('Eiwitten',Math.round(m.protein*m.ratio),m.protein,'var(--blue)')}${macro('Vetten',Math.round(m.fat*m.ratio),m.fat,'var(--orange)')}</div><div class="tip"><b>Focus vandaag:</b> ${esc(d.focus)}<br><b>Training:</b> ${esc(d.fuel)}</div>${mealSection('Ontbijt','breakfast',b)}${mealSection('Lunch','lunch',l)}${mealSection('Snack','snack',s)}${mealSection('Avondeten samen','dinner',{options:dinnerOpts},'3 receptsuggesties voor vanavond')}<div class="section-head"><div><h2>Receptdetails</h2><p>Avondmaaltijden voor twee</p></div></div>${d.dinners.map(c=>recipeCard(DATA.recipes.find(r=>r.code===c))).join('')}`}
+function macro(name,val,total,color){let p=Math.min(100,Math.round(val/total*100)||0);return `<div class="macro"><h3>${name}</h3><div class="ring" style="--p:${p};--c:${color}"><b>${p}%</b></div><small><b>${val}</b> / ${Math.round(total)} g</small></div>`}
+function recipeCard(r){if(!r)return'';return `<article class="recipe-card"><img class="recipe-hero" src="${r.photo}" alt="${esc(r.name)}"><div class="recipe-body"><h3>${esc(r.name)}</h3><div class="tags"><span class="tag">${esc(r.time)}</span><span class="tag">Voor 2 personen</span><span class="tag">${esc(r.type)}</span></div><p class="ingredients"><b>Ingrediënten:</b> ${esc(r.ingredients)}<br><br><b>Bereiding:</b> ${esc(r.prep)}<br><br><b>Jouw extra portie:</b> ${esc(r.addon)}</p><button class="primary" onclick="addRecipe('${r.code}')">Voeg toe aan boodschappen</button></div></article>`}
+function activeSchedule(){return state.coachSchedules[state.activeClientId]||BASE_SCHEDULE}
+function todaySchedule(){const idx=(new Date().getDay()+6)%7;return activeSchedule()[idx]||BASE_SCHEDULE[idx]}
+function dateFromISO(iso){return new Date(`${iso}T12:00:00`)}
+function addCalendarDays(iso,n){const d=dateFromISO(iso);d.setDate(d.getDate()+n);return localISO(d)}
+function weekStartISO(iso){const d=dateFromISO(iso),offset=(d.getDay()+6)%7;d.setDate(d.getDate()-offset);return localISO(d)}
+function weekDates(iso=state.planningDate){const start=weekStartISO(iso);return Array.from({length:7},(_,i)=>addCalendarDays(start,i))}
+function scheduleForDate(iso){const idx=(dateFromISO(iso).getDay()+6)%7;return activeSchedule()[idx]||BASE_SCHEDULE[idx]}
+function setPlanningDate(iso){state.planningDate=iso;store.set('planningDate',iso);render()}
+function movePlanningDay(amount){setPlanningDate(addCalendarDays(state.planningDate,amount))}
+function movePlanningWeek(amount){setPlanningDate(addCalendarDays(state.planningDate,amount*7))}
+let planningTouchX=0;
+function planningTouchStart(event){planningTouchX=event.changedTouches?.[0]?.clientX||0}
+function planningTouchEnd(event){const x=event.changedTouches?.[0]?.clientX||0,delta=x-planningTouchX;if(Math.abs(delta)>55)movePlanningDay(delta<0?1:-1)}
+function togglePlannedDay(iso){state.scheduleCompletions[iso]=!state.scheduleCompletions[iso];store.set('scheduleCompletions',state.scheduleCompletions);render();toast(state.scheduleCompletions[iso]?'Activiteit afgerond':'Activiteit weer geopend')}
+function savePlanningSleep(){const value=Math.max(0,Math.min(14,+$('#planningSleep')?.value||0));if(!value)return;state.sleepLog[state.planningDate]=value;store.set('sleepLog',state.sleepLog);render();toast('Slaap opgeslagen')}
+function recoveryAdvice(iso){
+  const previous=scheduleForDate(addCalendarDays(iso,-1)),sleep=state.sleepLog[iso],text=`${previous.title} ${previous.note}`.toLowerCase(),heavyLeg=/leg|lower|been|onderlichaam|squat|deadlift|hack/.test(text);
+  if(heavyLeg)return {level:'high',title:'Extra herstel na zware beentraining',text:`Gisteren stond ${previous.title} gepland. Kies vandaag voor voldoende slaap, eiwitten, vocht en rustige beweging. ${sleep&&sleep<7?'Je invoer van '+sleep+' uur slaap maakt herstel vandaag extra belangrijk.':''}`};
+  if(previous.type==='Training')return {level:'medium',title:'Herstel bewaken',text:`Na ${previous.title} van gisteren: beoordeel spierpijn en energie voordat je de intensiteit verhoogt.${sleep&&sleep<7?' Je sliep minder dan 7 uur.':''}`};
+  if(sleep&&sleep<7)return {level:'medium',title:'Slaap is vandaag het aandachtspunt',text:`Je noteerde ${sleep} uur slaap. Houd de trainingsbelasting beheersbaar en zet herstel voorop.`};
+  return {level:'good',title:'Herstel op koers',text:'Geen zwaar herstelconflict gevonden. Blijf slaap, energie en spierpijn meenemen in je keuze voor vandaag.'};
+}
+function goalProgress(goal,dates){
+  if(goal.type==='training')return dates.filter(d=>state.scheduleCompletions[d]&&scheduleForDate(d).type==='Training').length;
+  if(goal.type==='sleep'){const values=dates.map(d=>+state.sleepLog[d]).filter(Boolean);return values.length?Math.round(values.reduce((a,b)=>a+b,0)/values.length*10)/10:0}
+  return +goal.current||0;
+}
+function clientGoals(clientId=state.activeClientId){return state.coachGoals[clientId]||[]}
+function planningGoals(dates){const goals=clientGoals();return `<section class="weekly-goals"><div class="section-head"><div><span class="card-label">Van je coach</span><h2>Doelen van deze week</h2></div><span>${goals.length} actief</span></div><div class="goal-cards">${goals.length?goals.map(g=>{const current=goalProgress(g,dates),pct=Math.min(100,Math.round(current/Math.max(1,g.target)*100));return `<article class="goal-card"><div class="goal-icon">${g.type==='sleep'?'☾':g.type==='training'?'◇':'◎'}</div><div><b>${esc(g.title)}</b><span>${current} / ${g.target} ${esc(g.unit)} · ${esc(g.period||'deze week')}</span><div class="goal-track"><i style="width:${pct}%"></i></div></div><strong>${pct}%</strong></article>`}).join(''):'<div class="empty compact">Je coach heeft nog geen weekdoelen ingesteld.</div>'}</div></section>`}
+function weeks(){
+  const dates=weekDates(),client=CLIENTS.find(c=>c.id===state.activeClientId)||CLIENTS[0],selected=scheduleForDate(state.planningDate),recovery=recoveryAdvice(state.planningDate),today=localISO(),start=dateFromISO(dates[0]),end=dateFromISO(dates[6]);
+  const range=`${start.toLocaleDateString('nl-NL',{day:'numeric',month:'short'})} – ${end.toLocaleDateString('nl-NL',{day:'numeric',month:'short',year:'numeric'})}`;
+  return `${planningGoals(dates)}<section class="calendar-planner" ontouchstart="planningTouchStart(event)" ontouchend="planningTouchEnd(event)"><div class="calendar-head"><button onclick="movePlanningWeek(-1)" aria-label="Vorige week">‹</button><div><span>Weekplanning</span><b>${range}</b><small>${esc(client.name)}</small></div><button onclick="movePlanningWeek(1)" aria-label="Volgende week">›</button></div><div class="calendar-strip">${dates.map(iso=>{const d=dateFromISO(iso),plan=scheduleForDate(iso);return `<button class="calendar-day ${iso===state.planningDate?'selected':''} ${iso===today?'today':''} ${state.scheduleCompletions[iso]?'done':''}" onclick="setPlanningDate('${iso}')"><span>${d.toLocaleDateString('nl-NL',{weekday:'short'}).replace('.','')}</span><b>${d.getDate()}</b><i class="${plan.type.toLowerCase()}"></i></button>`}).join('')}</div><div class="calendar-quick"><button onclick="movePlanningDay(-1)">← Gisteren</button><button onclick="setPlanningDate('${today}')">Vandaag</button><button onclick="movePlanningDay(1)">Morgen →</button></div><article class="selected-plan ${selected.type.toLowerCase()}"><div><span class="plan-type">${esc(selected.type)} · ${fmt(state.planningDate)}</span><h2>${esc(selected.title)}</h2><p>${esc(selected.note)}</p></div><div class="selected-actions">${selected.type==='Training'?'<button class="secondary" onclick="goToTab(\'training\')">Bekijk training</button>':''}<button class="${state.scheduleCompletions[state.planningDate]?'done':''}" onclick="togglePlannedDay('${state.planningDate}')">${state.scheduleCompletions[state.planningDate]?'✓ Afgerond':'Markeer afgerond'}</button></div></article><section class="recovery-card ${recovery.level}"><div class="recovery-icon">${recovery.level==='good'?'✓':'!'}</div><div><span>Recovery-check</span><h3>${esc(recovery.title)}</h3><p>${esc(recovery.text)}</p></div><label><span>Slaap</span><div><input id="planningSleep" type="number" min="0" max="14" step="0.5" value="${state.sleepLog[state.planningDate]||''}" placeholder="7.5"><b>uur</b><button onclick="savePlanningSleep()">Opslaan</button></div></label></section></section><div class="section-head"><div><h2>Hele week</h2><p>Swipe op de kalender om per dag terug of vooruit te gaan.</p></div></div><div class="client-week-plan">${dates.map(iso=>{const d=dateFromISO(iso),plan=scheduleForDate(iso);return `<article class="client-plan-day ${plan.type.toLowerCase()} ${iso===state.planningDate?'selected':''}" onclick="setPlanningDate('${iso}')"><div class="day-marker"><span>${d.toLocaleDateString('nl-NL',{weekday:'short'}).slice(0,2)}</span><b>${d.getDate()}</b></div><div><span class="plan-type">${esc(plan.type)}</span><h3>${esc(plan.title)}</h3><p>${esc(plan.note)}</p></div><span class="day-state">${state.scheduleCompletions[iso]?'✓':'›'}</span></article>`}).join('')}</div>`;
+}
+function addRecipe(code){let r=DATA.recipes.find(x=>x.code===code);if(!r)return;let parts=r.ingredients.split(';').map(s=>s.trim()).filter(Boolean);parts.forEach(t=>{if(!state.shopping.some(x=>x.name===t))state.shopping.push({name:t,done:false,img:pic(t)})});store.set('shopping',state.shopping);toast('Ingrediënten toegevoegd')}
+function generateWeekShopping(){state.shopping=[];planner.filter(d=>d.week===state.week).forEach(d=>{let chosen=state.choices[d.date+'-dinner'];let code=d.dinners[chosen??0];let r=DATA.recipes.find(x=>x.code===code);if(r)r.ingredients.split(';').map(s=>s.trim()).filter(Boolean).forEach(t=>{if(!state.shopping.some(x=>x.name===t))state.shopping.push({name:t,done:false,img:pic(t)})})});store.set('shopping',state.shopping);render();toast('Weeklijst gemaakt')}
+function shopping(){return `<div class="shop-actions"><button class="action-card" onclick="generateWeekShopping()">▣<br>Importeer week ${state.week}</button><button class="action-card green" onclick="addCustom()">＋<br>Product toevoegen</button></div><div class="section-head"><div><h2>Boodschappen</h2><p>${state.shopping.length} items</p></div><button class="add-btn" onclick="clearShopping()">⋮</button></div><div class="list-card">${state.shopping.length?state.shopping.map((x,i)=>`<div class="shop-item ${x.done?'done':''}" onclick="toggleShop(${i})"><span class="small-check"></span><img src="${x.img||pic(x.name)}" alt=""><div><b>${esc(x.name)}</b></div></div>`).join(''):'<div class="empty">Nog geen producten. Importeer een week of voeg een product toe.</div>'}</div>`}
+function coach(){return `<div class="quick-prompts"><button onclick="ask('Wat moet ik vandaag eten?')">Vandaag eten</button><button onclick="ask('Wat moet ik morgen eten?')">Morgen eten</button><button onclick="ask('Wat eet ik rond een zware trainingsdag?')">Sportvoeding</button><button onclick="ask('Geef een recept voor vanavond')">Dinerrecept</button><button onclick="ask('Tips voor een zware conditietraining')">Conditietraining</button></div><div class="chat-card"><div class="messages" id="messages">${state.chat.map(m=>`<div class="bubble ${m.role}">${esc(m.text)}</div>`).join('')}</div></div><form class="chat-input" onsubmit="sendChat(event)"><input id="chatText" placeholder="Vraag iets over voeding of recepten…"><button>↑</button></form>`}
+function addDays(iso,n){let x=new Date(iso+'T12:00:00');x.setDate(x.getDate()+n);return localISO(x)}
+function planDay(iso){return planner.find(x=>x.date===iso)||null}
+function baseDateForQuestion(){let now=localISO();return planDay(now)?now:state.date}
+function resolveQuestionDate(q){
+  let t=q.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  let base=baseDateForQuestion();
+  if(/overmorgen/.test(t))return addDays(base,2);
+  if(/morgen/.test(t))return addDays(base,1);
+  if(/gisteren/.test(t))return addDays(base,-1);
+  if(/vandaag|vanavond|deze dag/.test(t))return base;
+  const months={januari:1,februari:2,maart:3,april:4,mei:5,juni:6,juli:7,augustus:8,september:9,oktober:10,november:11,december:12};
+  let md=t.match(/\b(\d{1,2})\s+(januari|februari|maart|april|mei|juni|juli|augustus|september|oktober|november|december)\b/);
+  if(md){let y=2026,m=String(months[md[2]]).padStart(2,'0'),d=String(+md[1]).padStart(2,'0');return `${y}-${m}-${d}`}
+  let numeric=t.match(/\b(\d{1,2})[-\/.](\d{1,2})(?:[-\/.](\d{2,4}))?\b/);
+  if(numeric){let y=numeric[3]?+(numeric[3].length===2?'20'+numeric[3]:numeric[3]):2026;return `${y}-${String(+numeric[2]).padStart(2,'0')}-${String(+numeric[1]).padStart(2,'0')}`}
+  const weekdays={zondag:0,maandag:1,dinsdag:2,woensdag:3,donderdag:4,vrijdag:5,zaterdag:6};
+  for(const [name,target] of Object.entries(weekdays))if(new RegExp('\\b'+name+'\\b').test(t)){
+    let x=new Date(base+'T12:00:00'),delta=(target-x.getDay()+7)%7;
+    if(delta===0 && /volgende/.test(t))delta=7;
+    return addDays(base,delta);
+  }
+  return state.date;
+}
+function dayMealPlan(d){
+  let b=optionsFor(d.daytype,'ontbijt'),l=optionsFor(d.daytype,'lunch'),sn=optionsFor(d.daytype,'snack')||optionsFor(d.daytype,'tussendoor');
+  let rs=d.dinners.map(c=>DATA.recipes.find(r=>r.code===c)).filter(Boolean);
+  return {b,l,sn,rs};
+}
+function describeDay(d){let p=dayMealPlan(d),r=p.rs[0];return `${fmt(d.date)} staat ${d.training} gepland. Ontbijt: ${p.b?.options[0]||'volgens plan'}. Lunch: ${p.l?.options[0]||'volgens plan'}. Snack: ${p.sn?.options[0]||'volgens plan'}. Avondeten: ${r?.name||'een passende maaltijd uit je plan'}. Dagdoel: circa ${Math.round(d.carbs)} g koolhydraten en ${Math.round(d.protein)} g eiwit.`}
+function aiAnswer(q){
+  let t=q.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  let targetDate=resolveQuestionDate(q),d=planDay(targetDate);
+  if(!d)return `Voor ${new Date(targetDate+'T12:00:00').toLocaleDateString('nl-NL',{day:'numeric',month:'long'})} staat geen dag in je 12-wekenplan. Het plan loopt van ${fmt(planner[0].date)} tot ${fmt(planner.at(-1).date)}.`;
+  if(/wat.*eten|moet.*eten|eetplan|menu|maaltijd|vandaag|morgen|overmorgen|maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag/.test(t))return describeDay(d);
+  if(/gel|sportvoeding|tijdens/.test(t)){
+    if(d.daytype==='Rust'||d.daytype==='Herstel')return `Voor ${fmt(d.date)} (${d.training}) heb je geen extra sportvoeding tijdens de sessie nodig.`;
+    return `Voor ${fmt(d.date)} (${d.training}): voldoende aan water tijdens de sessie. Bij een langere of zwaardere training kun je elektrolyten of een sportdrank overwegen, en eet binnen een uur na afloop koolhydraten plus 25–35 g eiwit voor herstel.`;
+  }
+  if(/recept|avond|diner/.test(t)){
+    let rs=dayMealPlan(d).rs;
+    return `Voor ${fmt(d.date)} passen deze diners: ${rs.map((r,i)=>`${i+1}. ${r.name} (${r.time})`).join(' ')} Mijn eerste keuze is ${rs[0]?.name}. Ingrediënten: ${rs[0]?.ingredients}`;
+  }
+  if(/afvallen|gewicht/.test(t))return `Met ${state.profile.weight} kg en dit trainingsschema krijgt prestatie voorrang boven snel afvallen. Houd een eventueel tekort klein op rustdagen en eet op kracht- en conditiedagen voldoende koolhydraten.`;
+  if(/vegetar/.test(t)){let rs=DATA.recipes.filter(r=>r.type.toLowerCase().includes('veget'));return `Vegetarische opties zijn onder andere ${rs.slice(0,5).map(r=>r.name).join(', ')}.`}
+  return `${describeDay(d)} Vraag bijvoorbeeld: “wat eet ik morgen?”, “welke gels heb ik donderdag nodig?” of “geef het recept voor het diner van zondag”.`;
+}
+function sendChat(e){e.preventDefault();let input=$('#chatText'),q=input.value.trim();if(!q)return;state.chat.push({role:'user',text:q},{role:'ai',text:aiAnswer(q)});store.set('chat',state.chat);render();setTimeout(()=>{let m=$('#messages');if(m)m.scrollTop=m.scrollHeight},50)}function ask(q){state.chat.push({role:'user',text:q},{role:'ai',text:aiAnswer(q)});store.set('chat',state.chat);render()}
+function profile(){let min=Math.min(...state.weights,85),max=Math.max(...state.weights,90);return `<div class="profile-card weight-hero"><h2>Doel ${state.profile.target} kg</h2><p>Prestatiegericht, zonder agressief calorietekort</p><div class="weight-stats">Start: ${state.weights[0]} kg<br>Huidig: ${state.profile.weight} kg<br>Lengte: ${state.profile.height} cm</div></div><div class="section-head"><div><h2>Voortgang</h2><p>Gewichtstrend</p></div></div><div class="profile-card"><div class="weight-log">${state.weights.map(w=>`<i style="height:${20+(w-min)/(max-min||1)*90}px" title="${w} kg"></i>`).join('')}</div></div><div class="section-head"><div><h2>Weergave</h2><p>Kies de stijl van de app</p></div></div><div class="profile-card"><div class="theme-toggle"><button class="${state.theme==='dark'?'active':''}" onclick="setTheme('dark')"><span>☾</span> Donker</button><button class="${state.theme==='light'?'active':''}" onclick="setTheme('light')"><span>☀</span> Licht</button></div></div><div class="section-head"><div><h2>Instellingen</h2></div></div><div class="profile-card"><div class="form-row"><div class="field"><label>Gewicht (kg)</label><input id="weightInput" type="number" step="0.1" value="${state.profile.weight}"></div><div class="field"><label>Doelgewicht (kg)</label><input id="targetInput" type="number" step="0.1" value="${state.profile.target}"></div></div><div class="field"><label>Lengte (cm)</label><input id="heightInput" type="number" value="${state.profile.height}"></div><button class="primary" onclick="saveProfile()">Opslaan</button></div>`}
+function dashboard(){
+  const d=todaySchedule(),start=state.weights[0]||state.profile.weight,current=state.profile.weight,target=state.profile.target;
+  const total=Math.abs(start-target)||1,progress=Math.max(0,Math.min(100,Math.round(Math.abs(start-current)/total*100)));
+  const remaining=Math.abs(current-target).toFixed(1);
+  return `<section class="welcome-row"><div><p>Goedemorgen</p><h2>Klaar voor vandaag?</h2></div><button class="avatar" onclick="goToTab('profile')" aria-label="Open profiel">K</button></section>
+  <section class="dashboard-grid">
+    <button class="dash-card weight-card" onclick="goToTab('checkin')"><div class="card-label">Gewicht</div><div class="weight-main"><div><strong>${current}</strong><span> kg</span><p>Nog ${remaining} kg tot je doel</p></div><div class="goal-ring" style="--goal:${progress}"><b>${progress}%</b></div></div><div class="mini-track"><i style="width:${progress}%"></i></div><div class="card-foot"><span>Start ${start} kg</span><span>Doel ${target} kg</span></div></button>
+    <button class="dash-card plan-card" onclick="goToTab('training')"><div class="card-label">Huidig trainingsplan</div><div class="plan-status"><span>Vandaag</span><b>${esc(d.title)}</b></div><p>${esc(d.note)}</p><div class="card-link">Bekijk training <span>→</span></div></button>
+    <button class="dash-card action-card-home training-action" onclick="goToTab('training')"><span class="dash-icon">◇</span><div><strong>Mijn trainingen</strong><small>Schema, oefeningen en voortgang</small></div><b>›</b></button>
+    <button class="dash-card action-card-home food-action" onclick="goToTab('diary')"><span class="dash-icon">◉</span><div><strong>Mijn voeding</strong><small>Macroplan, losse producten of receptenplan</small></div><b>›</b></button>
+    <button class="dash-card action-card-home learning-action" onclick="goToTab('courses')"><span class="dash-icon">◫</span><div><strong>Mijn leeromgeving</strong><small>Cursussen, lessen en jouw voortgang</small></div><b>›</b></button>
+    <button class="dash-card action-card-home longevity-action" onclick="goToTab('longevity')"><span class="dash-icon">♡</span><div><strong>Mijn longevity</strong><small>Labwaarden, referenties en aandachtspunten</small></div><b>›</b></button>
+    <button class="dash-card checkin-action" onclick="goToTab('checkin')"><div><span class="card-label">Volgende stap</span><h3>Doe je wekelijkse check-in</h3><p>Voeg je meting en voortgangsfoto's toe.</p></div><span class="checkin-arrow">→</span></button>
+  </section>
+  <section class="today-focus"><div><span>Planning vandaag</span><strong>${esc(d.type)} · ${esc(d.note)}</strong></div><button onclick="goToTab('weeks')">Bekijk week</button></section>`;
+}
+function graphPoints(values){const min=Math.min(...values)-.5,max=Math.max(...values)+.5,span=max-min||1;return values.map((v,i)=>`${8+i*(284/Math.max(1,values.length-1))},${92-((v-min)/span)*72}`).join(' ')}
+function checkIn(){
+  const p=state.checkInPrefs,entries=[...state.weightEntries].sort((a,b)=>a.date.localeCompare(b.date)),values=entries.map(x=>x.weight),first=entries[0]?.weight||state.profile.weight,last=entries.at(-1)?.weight||state.profile.weight,delta=(last-first).toFixed(1);
+  const tabs=[p.weight&&['weight','Gewicht'],p.photos&&['photos',"Foto's"],p.skinfold&&['skinfold','Huidplooien']].filter(Boolean);
+  return `<div class="checkin-top"><div><p class="card-label">Jouw voortgang</p><h2>Check-in</h2><p>Kies zelf welke onderdelen jij bijhoudt.</p></div><button class="settings-btn" onclick="document.querySelector('.checkin-settings').classList.toggle('open')">Instellen</button></div>
+  <div class="checkin-settings"><b>Zichtbare onderdelen</b><label><input type="checkbox" ${p.weight?'checked':''} onchange="toggleCheckIn('weight')"> Gewicht & grafiek</label><label><input type="checkbox" ${p.photos?'checked':''} onchange="toggleCheckIn('photos')"> Voor- en nafoto's</label><label><input type="checkbox" ${p.skinfold?'checked':''} onchange="toggleCheckIn('skinfold')"> Huidplooimeting</label></div>
+  <div class="checkin-tabs">${tabs.map(([id,label])=>`<button class="${state.checkInTab===id?'active':''}" onclick="setCheckInTab('${id}')">${label}</button>`).join('')}</div>
+  ${state.checkInTab==='weight'&&p.weight?`<section class="measure-card"><div class="measure-head"><div><span>Gewichtsontwikkeling</span><strong>${last} kg</strong></div><span class="trend ${+delta>0?'neutral':''}">${+delta>0?'+':''}${delta} kg</span></div><svg class="weight-chart" viewBox="0 0 300 108" role="img" aria-label="Gewichtsontwikkeling per datum"><line x1="8" y1="92" x2="292" y2="92"></line><polyline points="${graphPoints(values)}"></polyline>${graphPoints(values).split(' ').map(pt=>{const [x,y]=pt.split(',');return `<circle cx="${x}" cy="${y}" r="4"></circle>`}).join('')}</svg><div class="dated-weight-form"><label><span>Datum</span><input id="checkWeightDate" type="date" value="${localISO()}"></label><label><span>Gewicht</span><div><input id="checkWeight" type="number" step="0.1" value="${last}"><b>kg</b></div></label><button onclick="saveCheckWeight()">Meting opslaan</button></div></section><section><div class="section-head"><div><h2>Metingen</h2><p>${entries.length} opgeslagen momenten</p></div></div><div class="list-card weight-history">${[...entries].reverse().map((x,i,arr)=>`<div class="weight-history-row"><div><b>${new Date(x.date+'T12:00:00').toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'})}</b><span>${i===0?'Meest recent':'Eerdere meting'}</span></div><strong>${x.weight} kg</strong><button onclick="deleteWeightEntry(${x.id})" aria-label="Verwijder meting">×</button></div>`).join('')}</div></section>`:''}
+  ${state.checkInTab==='photos'&&p.photos?`<section class="measure-card"><div class="measure-head"><div><span>Voortgangsfoto's</span><strong>Before & after</strong></div></div><div class="photo-grid"><label class="photo-slot" id="beforePhoto"><input type="file" accept="image/*" onchange="previewPhoto(this,'beforePhoto')"><span>＋</span><b>Before</b><small>Voeg foto toe</small></label><label class="photo-slot" id="afterPhoto"><input type="file" accept="image/*" onchange="previewPhoto(this,'afterPhoto')"><span>＋</span><b>After</b><small>Voeg foto toe</small></label></div></section>`:''}
+  ${state.checkInTab==='skinfold'&&p.skinfold?`<section class="measure-card"><div class="measure-head"><div><span>Huidplooimeting</span><strong>7-puntsmeting</strong></div><span class="trend neutral">Optioneel</span></div><div class="skinfold-grid">${['Borst','Buik','Dij','Triceps','Subscapulair','Suprailiacaal','Midaxillair'].map(x=>`<label>${x}<input type="number" inputmode="decimal" placeholder="mm"></label>`).join('')}</div><button class="primary" onclick="toast('Huidplooimeting opgeslagen')">Meting opslaan</button></section>`:''}`;
+}
+function setCheckInTab(tab){state.checkInTab=tab;store.set('checkInTab',tab);render()}
+function toggleCheckIn(key){state.checkInPrefs[key]=!state.checkInPrefs[key];if(!state.checkInPrefs[state.checkInTab])state.checkInTab=state.checkInPrefs.weight?'weight':state.checkInPrefs.photos?'photos':'skinfold';store.set('checkInPrefs',state.checkInPrefs);store.set('checkInTab',state.checkInTab);render()}
+function syncWeightsFromEntries(){const sorted=[...state.weightEntries].sort((a,b)=>a.date.localeCompare(b.date));state.weights=sorted.map(x=>x.weight);if(sorted.length)state.profile.weight=sorted.at(-1).weight;store.set('weightEntries',state.weightEntries);store.set('weights',state.weights);store.set('profile',state.profile)}
+function saveCheckWeight(){const date=$('#checkWeightDate')?.value,w=parseFloat($('#checkWeight')?.value);if(!date||!(w>35&&w<250))return;const existing=state.weightEntries.find(x=>x.date===date);if(existing)existing.weight=w;else state.weightEntries.push({id:Date.now(),date,weight:w});syncWeightsFromEntries();render();toast(existing?'Meting bijgewerkt':'Nieuwe meting opgeslagen')}
+function deleteWeightEntry(id){state.weightEntries=state.weightEntries.filter(x=>x.id!==id);syncWeightsFromEntries();render();toast('Meting verwijderd')}
+function previewPhoto(input,id){const file=input.files&&input.files[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{const slot=document.getElementById(id);slot.style.backgroundImage=`linear-gradient(rgba(0,0,0,.12),rgba(0,0,0,.5)),url("${reader.result}")`;slot.classList.add('has-photo');slot.querySelector('small').textContent='Foto geselecteerd'};reader.readAsDataURL(file)}
+function courses(){return `<section class="learning-hero"><div><span class="card-label">Mijn leeromgeving</span><h2>Blijf jezelf ontwikkelen</h2><p>Hier komen jouw cursussen, videolessen en opdrachten samen.</p></div><div class="learning-progress"><b>0%</b><span>gestart</span></div></section><div class="section-head"><div><h2>Mijn cursussen</h2><p>De cursusomgeving wordt binnenkort gevuld.</p></div></div><div class="course-grid"><article class="course-card featured"><span class="course-status">Binnenkort</span><div class="course-icon">◎</div><h3>De basis van krachttraining</h3><p>Leer techniek, trainingsprincipes en hoe je veilig progressie maakt.</p><div class="course-meta"><span>6 lessen</span><span>45 min</span></div></article><article class="course-card"><span class="course-status">Binnenkort</span><div class="course-icon">◉</div><h3>Voeding voor resultaat</h3><p>Begrijp calorieën, macro's en praktische keuzes voor elke dag.</p><div class="course-meta"><span>5 lessen</span><span>35 min</span></div></article><article class="course-card"><span class="course-status">Binnenkort</span><div class="course-icon">◇</div><h3>Herstel & gewoontes</h3><p>Bouw aan slaap, herstel en routines die je kunt volhouden.</p><div class="course-meta"><span>4 lessen</span><span>30 min</span></div></article></div>`}
+function setLabGroup(group){state.labGroup=group;store.set('labGroup',group);render()}
+function activeLabReport(){return state.labReports.find(x=>x.id===state.activeLabReportId)||state.labReports.at(-1)||DEFAULT_LAB_REPORT}
+function selectLabReport(id){state.activeLabReportId=id;store.set('activeLabReportId',id);render()}
+function setLabMetric(name){state.labMetric=name;store.set('labMetric',name);render()}
+function labNumeric(value){const n=parseFloat(String(value).replace(',','.').replace(/[^0-9.\-]/g,''));return Number.isFinite(n)?n:null}
+function labStatusFor(template,value){
+  const n=labNumeric(value),ref=template.reference;if(n===null||template.status==='context')return 'context';
+  const range=ref.match(/([0-9.,]+)\s*[–-]\s*([0-9.,]+)/);if(range){const lo=+range[1].replace(',','.'),hi=+range[2].replace(',','.');return n<lo?'low':n>hi?'high':'ok'}
+  const upper=ref.match(/<\s*([0-9.,]+)/);if(upper)return n>=+upper[1].replace(',','.')?'high':'ok';
+  const lower=ref.match(/[>≥]\s*([0-9.,]+)/);if(lower)return n<+lower[1].replace(',','.')?'low':'ok';
+  return 'context';
+}
+function labResultsForGroup(report=activeLabReport()){
+  const xs=report.results||[];
+  return state.labGroup==='attention'?xs.filter(x=>x.status==='high'||x.status==='low'):state.labGroup==='within'?xs.filter(x=>x.status==='ok'):xs.filter(x=>x.status==='context');
+}
+function labRows(){
+  const results=labResultsForGroup();
+  return results.length?results.map(x=>`<article class="lab-row"><div><span>${esc(x.group)}</span><b>${esc(x.name)}</b></div><div class="lab-value"><strong>${esc(x.value)}</strong><small>${esc(x.unit)}</small></div><div><span>Referentie rapport</span><b>${esc(x.reference)}</b></div><em class="lab-status ${x.status}">${x.status==='high'?'Hoog':x.status==='low'?'Laag':x.status==='ok'?'Binnen bereik':'Context'}</em></article>`).join(''):'<div class="empty compact">Geen waarden in deze categorie voor deze meting.</div>';
+}
+function labMetricSeries(name){return [...state.labReports].sort((a,b)=>a.date.localeCompare(b.date)).map(r=>({date:r.date,item:r.results.find(x=>x.name===name)})).filter(x=>x.item&&labNumeric(x.item.value)!==null).map(x=>({...x,value:labNumeric(x.item.value)}))}
+function labTrendChart(name){
+  const series=labMetricSeries(name);if(!series.length)return '<div class="empty compact">Nog geen numerieke metingen voor deze waarde.</div>';
+  const vals=series.map(x=>x.value),min=Math.min(...vals),max=Math.max(...vals),pad=(max-min||Math.max(1,max*.1))*.18,lo=min-pad,hi=max+pad,span=hi-lo||1;
+  const pts=series.map((x,i)=>({x:20+i*(360/Math.max(1,series.length-1)),y:112-((x.value-lo)/span)*88,...x}));
+  return `<svg class="lab-trend-svg" viewBox="0 0 400 145" role="img" aria-label="Trend van ${esc(name)}"><line x1="20" y1="112" x2="380" y2="112"></line><polyline points="${pts.map(p=>`${p.x},${p.y}`).join(' ')}"></polyline>${pts.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="5"><title>${p.date}: ${p.item.value} ${p.item.unit}</title></circle><text x="${p.x}" y="135" text-anchor="middle">${new Date(p.date+'T12:00:00').toLocaleDateString('nl-NL',{day:'numeric',month:'short'})}</text>`).join('')}</svg>`;
+}
+function labComparisonRows(){
+  const reports=[...state.labReports].sort((a,b)=>a.date.localeCompare(b.date)),latest=activeLabReport(),idx=reports.findIndex(r=>r.id===latest.id),previous=reports[idx>0?idx-1:-1];
+  const names=[...new Set(reports.flatMap(r=>r.results.map(x=>x.name)))];
+  return names.map(name=>{const now=latest.results.find(x=>x.name===name),before=previous?.results.find(x=>x.name===name),a=labNumeric(now?.value),b=labNumeric(before?.value),delta=a!==null&&b!==null?a-b:null;return `<tr><td><b>${esc(name)}</b><span>${esc(now?.group||before?.group||'')}</span></td><td>${before?`${esc(before?.value||'—')} <small>${esc(before?.unit||'')}</small>`:'—'}</td><td>${now?`${esc(now.value)} <small>${esc(now.unit)}</small>`:'—'}</td><td class="${delta===null?'':delta>0?'delta-up':delta<0?'delta-down':'delta-flat'}">${delta===null?'—':`${delta>0?'+':''}${Number(delta.toFixed(3))}`}</td><td>${now?`<em class="lab-status ${now.status}">${now.status==='high'?'Hoog':now.status==='low'?'Laag':now.status==='ok'?'Binnen':'Context'}</em>`:'—'}</td></tr>`}).join('');
+}
+function reportDateFromText(text){const m=text.match(/\b([0-3]?\d)[-\/.]([01]?\d)[-\/.](20\d{2})\b/);return m?`${m[3]}-${String(m[2]).padStart(2,'0')}-${String(m[1]).padStart(2,'0')}`:localISO()}
+const LAB_ALIASES={'Leucocyten':['leucocyten','leukocyten'],'Erytrocyten':['erytrocyten'],'Hemoglobine':['hemoglobine','hb'],'Hematocriet':['hematocriet','hct'],'MCV':['mcv'],'MCH':['mch'],'MCHC':['mchc'],'RDW-CV':['rdw-cv','rdw'],'Trombocyten':['trombocyten','plaatjes'],'Totaal cholesterol':['totaal cholesterol','cholesterol totaal'],'HDL-cholesterol':['hdl-cholesterol','hdl cholesterol','hdl'],'LDL-cholesterol':['ldl-cholesterol','ldl cholesterol','ldl'],'Triglyceriden':['triglyceriden'],'ASAT':['asat','ast'],'ALAT':['alat','alt'],'Gamma-GT':['gamma-gt','ggt'],'Creatinine':['creatinine'],'eGFR (CKD-EPI)':['egfr','ckd-epi'],'Albumine':['albumine'],'LH':['lh'],'FSH':['fsh'],'Testosteron totaal':['testosteron totaal','totaal testosteron'],'Testosteron vrij':['testosteron vrij','vrij testosteron'],'SHBG':['shbg']};
+function extractLabValues(text){
+  const clean=String(text).replace(/\s+/g,' '),lower=clean.toLowerCase();
+  return LAB_RESULTS.flatMap(template=>{const aliases=LAB_ALIASES[template.name]||[template.name.toLowerCase()];let hit=-1,alias='';for(const a of aliases){const i=lower.indexOf(a.toLowerCase());if(i>=0&&(hit<0||i<hit)){hit=i;alias=a}}if(hit<0)return[];const after=clean.slice(hit+alias.length,hit+alias.length+90);const m=after.match(/(?:[:\s]|^)([<>]?\s*\d+(?:[.,]\d+)?)/);if(!m)return[];const value=m[1].replace(/\s/g,'').replace(',','.');return[{...template,value,status:labStatusFor(template,value)}]})
+}
+function setLabUploadStatus(message,kind=''){const el=document.getElementById('labUploadStatus');if(el){el.textContent=message;el.className=`lab-upload-status ${kind}`}}
+async function loadExternalScript(src,globalName){if(window[globalName])return window[globalName];await new Promise((resolve,reject)=>{const s=document.createElement('script');s.src=src;s.onload=resolve;s.onerror=reject;document.head.appendChild(s)});return window[globalName]}
+async function extractPdfText(file){const pdfjs=await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs');pdfjs.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';const pdf=await pdfjs.getDocument({data:await file.arrayBuffer()}).promise;let text='';for(let i=1;i<=pdf.numPages;i++){setLabUploadStatus(`PDF analyseren · pagina ${i} van ${pdf.numPages}`);const page=await pdf.getPage(i),content=await page.getTextContent();text+=' '+content.items.map(x=>x.str).join(' ')}return text}
+async function extractImageText(file){setLabUploadStatus('Foto voorbereiden voor herkenning…');const Tesseract=await loadExternalScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js','Tesseract');const result=await Tesseract.recognize(file,'eng',{logger:m=>{if(m.status==='recognizing text')setLabUploadStatus(`Foto analyseren · ${Math.round((m.progress||0)*100)}%`)}});return result.data.text}
+async function analyzeLabUpload(input){
+  const file=input.files?.[0];if(!file)return;if(file.size>12*1024*1024){setLabUploadStatus('Bestand is groter dan 12 MB. Kies een kleiner bestand.','error');return}
+  state.labUploadBusy=true;setLabUploadStatus('Analyse starten…');
+  try{const text=file.type==='application/pdf'||file.name.toLowerCase().endsWith('.pdf')?await extractPdfText(file):await extractImageText(file),results=extractLabValues(text);state.labDraft={fileName:file.name,date:reportDateFromText(text),results};render();setLabUploadStatus(`${results.length} waarden herkend. Controleer ze voordat je opslaat.`,'success')}
+  catch(error){console.error(error);state.labDraft={fileName:file.name,date:localISO(),results:[]};render();setLabUploadStatus('Automatische herkenning lukte niet. Voeg de waarden handmatig toe.','error')}
+  finally{state.labUploadBusy=false}
+}
+function addLabDraftRow(){if(!state.labDraft)state.labDraft={fileName:'Handmatige invoer',date:localISO(),results:[]};const used=new Set(state.labDraft.results.map(x=>x.name)),template=LAB_RESULTS.find(x=>!used.has(x.name))||LAB_RESULTS[0];state.labDraft.results.push({...template,value:''});render()}
+function changeLabDraftMetric(index,name){const template=LAB_RESULTS.find(x=>x.name===name);if(template)state.labDraft.results[index]={...template,value:state.labDraft.results[index].value};render()}
+function removeLabDraftRow(index){state.labDraft.results.splice(index,1);render()}
+function cancelLabDraft(){state.labDraft=null;render()}
+function saveLabDraft(){
+  if(!state.labDraft)return;const date=$('#labDraftDate')?.value||localISO(),rows=[...document.querySelectorAll('[data-lab-draft-row]')],results=rows.map(row=>{const template=LAB_RESULTS.find(x=>x.name===row.querySelector('select').value),value=row.querySelector('input').value.trim();return value&&template?{...template,value,status:labStatusFor(template,value)}:null}).filter(Boolean);if(!results.length){toast('Voeg minimaal één waarde toe');return}
+  const report={id:`report-${Date.now()}`,date,label:`Labrapport ${new Date(date+'T12:00:00').toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'})}`,source:state.labDraft.fileName,results};state.labReports.push(report);state.labReports.sort((a,b)=>a.date.localeCompare(b.date));state.activeLabReportId=report.id;store.set('labReports',state.labReports);store.set('activeLabReportId',report.id);state.labDraft=null;render();toast(`${results.length} gecontroleerde waarden toegevoegd`)
+}
+function labDraftPanel(){if(!state.labDraft)return'';return `<section class="lab-review"><div class="lab-review-head"><div><span class="card-label">Controle vereist</span><h3>Herkende waarden</h3><p>Pas fouten aan. Alleen bevestigde waarden worden opgeslagen.</p></div><label>Meetdatum<input id="labDraftDate" type="date" value="${state.labDraft.date}"></label></div><div class="lab-draft-list">${state.labDraft.results.map((x,i)=>`<div data-lab-draft-row><select onchange="changeLabDraftMetric(${i},this.value)">${LAB_RESULTS.map(t=>`<option ${t.name===x.name?'selected':''}>${esc(t.name)}</option>`).join('')}</select><input value="${esc(x.value)}" placeholder="Waarde" inputmode="decimal"><span>${esc(x.unit)}</span><button onclick="removeLabDraftRow(${i})" aria-label="Verwijder">×</button></div>`).join('')||'<div class="empty compact">Nog geen waarden herkend.</div>'}</div><button class="lab-add-row" onclick="addLabDraftRow()">＋ Waarde toevoegen</button><div class="lab-review-actions"><button class="secondary" onclick="cancelLabDraft()">Annuleren</button><button onclick="saveLabDraft()">Bevestigen en vergelijken</button></div></section>`}
+const LAB_EXPLAINERS={
+  'Hematocriet':{meaning:'Dit is het deel van je bloed dat uit rode bloedcellen bestaat. Een hoge waarde kan het bloed stroperiger maken.',action:'Bespreek dit op korte termijn met je arts. Laat de arts bepalen of en wanneer een herhaalmeting nodig is.'},
+  'MCV':{meaning:'Dit geeft aan hoe groot je rode bloedcellen gemiddeld zijn.',action:'Bespreek mogelijke oorzaken en aanvullend onderzoek met je arts, vooral samen met de andere bloedwaarden.'},
+  'MCHC':{meaning:'Dit laat zien hoeveel rode bloedkleurstof gemiddeld in je rode bloedcellen zit.',action:'Laat dit samen met hemoglobine, MCV en klachten beoordelen; één losse waarde is niet genoeg.'},
+  'HDL-cholesterol':{meaning:'HDL helpt cholesterol uit je bloed af te voeren en wordt vaak het beschermende cholesterol genoemd.',action:'Bespreek je totale hart- en vaatrisico. Beweging, niet roken en een passend voedingspatroon kunnen onderdeel zijn van het plan.'},
+  'Triglyceriden':{meaning:'Dit zijn vetten in je bloed. De uitslag kan veranderen door eten, alcohol en het moment van prikken.',action:'Controleer of je nuchter was en bespreek met je arts of herhalen nodig is.'},
+  'LH':{meaning:'LH is een signaal van je hersenen naar je hormoonklieren. Het helpt onder andere de aanmaak van geslachtshormonen aan te sturen.',action:'Laat dit beoordelen samen met FSH, testosteron, medicatie en eventueel hormoongebruik.'},
+  'FSH':{meaning:'FSH is een hormoonsignaal dat betrokken is bij de werking van de geslachtsklieren.',action:'Laat dit beoordelen samen met LH en testosteron. Verander hormonen of medicatie niet zelfstandig.'},
+  'Testosteron totaal':{meaning:'Dit is de totale hoeveelheid testosteron die in je bloed is gemeten.',action:'Een duidelijk afwijkende waarde hoort medisch beoordeeld te worden. Pas dosering of medicatie niet zelf aan.'},
+  'Leucocyten':{meaning:'Dit zijn witte bloedcellen die helpen bij je afweer.',action:'Bekijk de waarde samen met klachten en eerdere metingen.'},
+  'Hemoglobine':{meaning:'Dit eiwit in rode bloedcellen vervoert zuurstof door je lichaam.',action:'Beoordeel dit samen met hematocriet en de andere rodebloedcelwaarden.'},
+  'Creatinine':{meaning:'Dit is een afvalstof die wordt gebruikt om een indruk van de nierfunctie te krijgen.',action:'Bekijk dit samen met eGFR, spiermassa, training en vochtinname.'},
+  'eGFR (CKD-EPI)':{meaning:'Dit is een schatting van hoe goed je nieren het bloed filteren.',action:'Een trend over meerdere metingen zegt meer dan één losse uitslag.'}
+};
+function plainLabText(item){return LAB_EXPLAINERS[item.name]||{meaning:`${item.name} hoort bij ${item.group.toLowerCase()}. De waarde is ${item.status==='high'?'hoger':item.status==='low'?'lager':'anders te beoordelen'} dan het genoemde laboratoriumbereik.`,action:'Laat de waarde in samenhang met klachten, medicatie en eerdere uitslagen beoordelen.'}}
+function longevityPlainSummary(report){
+  const attention=report.results.filter(x=>x.status==='high'||x.status==='low'),ok=report.results.filter(x=>x.status==='ok').length;
+  const intro=attention.length?`Van de ${report.results.length} gemeten waarden vallen er ${attention.length} buiten het bereik van het laboratorium. Dat betekent niet automatisch dat je ziek bent, maar deze punten verdienen uitleg en controle.`:`De waarden in dit rapport vallen binnen de opgegeven bereiken. Blijf vooral naar de ontwikkeling over meerdere metingen kijken.`;
+  const cards=attention.slice(0,6).map(x=>{const info=plainLabText(x);return `<article><div class="plain-value-head"><div><span>${esc(x.group)}</span><h4>${esc(x.name)}</h4></div><em class="lab-status ${x.status}">${esc(x.value)} ${esc(x.unit)}</em></div><p><b>Wat betekent dit?</b> ${esc(info.meaning)}</p><p><b>Wat kun je doen?</b> ${esc(info.action)}</p></article>`}).join('');
+  return `<section class="plain-summary"><div class="plain-summary-head"><div><span class="card-label">Stap 1 · eerst begrijpen</span><h3>Jouw uitslag in gewone taal</h3><p>${intro}</p></div><div class="plain-score"><b>${ok}</b><span>binnen bereik</span></div></div>${cards?`<div class="plain-findings">${cards}</div>`:''}<div class="action-plan"><span class="card-label">Plan van aanpak</span><ol><li><b>Controleer de gegevens.</b><span>Kloppen meetdatum, eenheden en referentiewaarden met het originele rapport?</span></li><li><b>Bespreek de aandachtspunten.</b><span>Neem het volledige rapport mee naar je huisarts of behandelaar, inclusief medicatie, supplementen en eventueel hormoongebruik.</span></li><li><b>Maak samen een vervolgplan.</b><span>Laat je arts bepalen welke waarden opnieuw gemeten moeten worden en wanneer. Verander medicatie niet zelfstandig.</span></li><li><b>Vergelijk de trend.</b><span>Upload een volgende uitslag op dezelfde manier, zodat je ziet of waarden stijgen, dalen of gelijk blijven.</span></li></ol></div></section>`;
+}
+function longevity(){
+  const report=activeLabReport(),attention=report.results.filter(x=>x.status==='high'||x.status==='low').length,within=report.results.filter(x=>x.status==='ok').length,context=report.results.filter(x=>x.status==='context').length,metrics=[...new Set(state.labReports.flatMap(r=>r.results.map(x=>x.name)))];
+  if(!metrics.includes(state.labMetric))state.labMetric=metrics[0]||'Hematocriet';
+  return `<section class="longevity-hero"><div><span class="card-label">Longevity dashboard</span><h2>Vergelijk al je gezondheidswaarden</h2><p>Bekijk veranderingen per meetdatum, vergelijk uitslagen en voeg een nieuw labrapport toe.</p></div><div class="lab-attention"><b>${attention}</b><span>aandachtspunten</span></div></section>
+  ${longevityPlainSummary(report)}
+  <section class="lab-upload-card"><div><span class="card-label">Nieuwe meting</span><h3>Upload een foto of PDF</h3><p>De app herkent bekende labwaarden. Jij controleert iedere waarde voordat deze aan je overzicht wordt toegevoegd.</p><small>Verwerking gebeurt in je browser. Deel medische gegevens alleen op een apparaat dat je vertrouwt.</small></div><label class="lab-upload-button">＋ Rapport kiezen<input type="file" accept="application/pdf,image/jpeg,image/png,image/webp" onchange="analyzeLabUpload(this)"></label><div id="labUploadStatus" class="lab-upload-status"></div></section>
+  ${labDraftPanel()}
+  <div class="lab-report-toolbar"><label>Geselecteerde meting<select onchange="selectLabReport(this.value)">${[...state.labReports].sort((a,b)=>b.date.localeCompare(a.date)).map(r=>`<option value="${r.id}" ${r.id===report.id?'selected':''}>${new Date(r.date+'T12:00:00').toLocaleDateString('nl-NL',{day:'numeric',month:'long',year:'numeric'})} · ${r.results.length} waarden</option>`).join('')}</select></label><span>${state.labReports.length} ${state.labReports.length===1?'meetmoment':'meetmomenten'}</span></div>
+  <div class="lab-summary"><div><b>${within}</b><span>binnen labbereik</span></div><div><b>${attention}</b><span>buiten labbereik</span></div><div><b>${context}</b><span>alleen context</span></div></div>
+  ${attention?`<section class="clinical-alert"><span>!</span><div><b>Bespreek duidelijke afwijkingen met je huisarts of behandelend arts</b><p>De app vergelijkt uitsluitend met het bereik dat bij de waarde staat. Klachten, medicatie, training, hydratatie en eerdere uitslagen bepalen mede wat een uitslag betekent.</p></div></section>`:''}
+  <section class="lab-trend-card"><div class="lab-trend-head"><div><span class="card-label">Ontwikkeling</span><h3>Trend per waarde</h3></div><select onchange="setLabMetric(this.value)">${metrics.map(x=>`<option ${x===state.labMetric?'selected':''}>${esc(x)}</option>`).join('')}</select></div>${labTrendChart(state.labMetric)}</section>
+  <section class="lab-compare-card"><div class="section-head"><div><h2>Alle waarden vergelijken</h2><p>De geselecteerde uitslag naast het vorige meetmoment</p></div></div><div class="lab-table-wrap"><table class="lab-compare-table"><thead><tr><th>Waarde</th><th>Vorige</th><th>Geselecteerd</th><th>Verschil</th><th>Status</th></tr></thead><tbody>${labComparisonRows()}</tbody></table></div></section>
+  <div class="lab-tabs"><button class="${state.labGroup==='attention'?'active':''}" onclick="setLabGroup('attention')">Aandacht (${attention})</button><button class="${state.labGroup==='within'?'active':''}" onclick="setLabGroup('within')">Binnen bereik (${within})</button><button class="${state.labGroup==='context'?'active':''}" onclick="setLabGroup('context')">Context (${context})</button></div>
+  <section class="lab-list">${labRows()}</section>
+  <section class="medical-note"><b>Belangrijk</b><p>Dit dashboard ondersteunt vergelijking en signalering, maar stelt geen diagnose. “Binnen bereik” betekent niet automatisch gezond en “buiten bereik” is niet automatisch ziekte. Laat interpretatie en vervolgonderzoek over aan een bevoegde arts.</p></section>`;
+}
+function assignedTrainingPlan(clientId=state.activeClientId){const id=state.clientPlanAssignments[clientId];return state.trainingPlans.find(p=>p.id===id)||null}
+function methodLabel(method){return method==='cluster'?'Cluster 6 × 6 · 10 sec rust':method==='superset-a'?'Superset A':method==='superset-b'?'Superset B':'Normale sets'}
+window.openPlanSession=function(idx){state.planSessionIdx=idx;render()}
+window.closePlanSession=function(){state.planSessionIdx=null;render()}
+window.trainingPlanHome=function(){
+  const client=CLIENTS.find(c=>c.id===state.activeClientId)||CLIENTS[0],plan=assignedTrainingPlan();
+  if(!plan)return `<div class="plan-empty"><span>◇</span><h2>Nog geen trainingsplan</h2><p>Je coach heeft nog geen persoonlijk schema aan jouw account gekoppeld.</p></div>`;
+  if(state.planSessionIdx!=null){const s=plan.sessions[state.planSessionIdx];if(!s){state.planSessionIdx=null;return window.trainingPlanHome()}return `<button class="t-back" onclick="closePlanSession()">‹ Mijn plan</button><section class="plan-session-hero"><span>${esc(s.day)}</span><h2>${esc(s.title)}</h2><p>${s.exercises.length} oefeningen · persoonlijk ingesteld door je coach</p></section><div class="plan-exercises">${s.exercises.map((e,i)=>`<article class="plan-exercise ${e.method}"><div class="exercise-number">${i+1}</div><div><span class="method-badge">${methodLabel(e.method)}</span><h3>${esc(e.name)}</h3><p>${e.sets} sets × ${esc(e.reps)} reps</p></div></article>`).join('')}</div><button class="primary" onclick="toast('Training gestart vanuit jouw persoonlijke plan')">Start deze training</button>`}
+  return `<div class="my-plan-head"><div><span class="card-label">Mijn plan</span><h2>${esc(plan.title)}</h2><p>${esc(plan.description)}</p></div><span class="coach-plan-pill">Van je coach</span></div><section class="plan-week-summary"><div><b>${plan.sessions.length}</b><span>trainingen per week</span></div><div><b>${plan.sessions.reduce((n,s)=>n+s.exercises.length,0)}</b><span>oefeningen</span></div><div><b>${plan.sessions.some(s=>s.exercises.some(e=>e.method==='cluster'))?'Ja':'Nee'}</b><span>clustersets</span></div></section><div class="section-head"><div><h2>Jouw trainingsweek</h2><p>Persoonlijk plan voor ${esc(client.name)}</p></div></div><div class="plan-session-list">${plan.sessions.map((s,i)=>`<button onclick="openPlanSession(${i})"><div class="plan-day"><span>${esc(s.day.slice(0,2))}</span></div><div><b>${esc(s.title)}</b><small>${s.exercises.length} oefeningen · ${s.exercises.some(e=>e.method==='cluster')?'inclusief clusterset':s.exercises.some(e=>String(e.method).startsWith('superset'))?'inclusief superset':'normale sets'}</small></div><span>›</span></button>`).join('')}</div>`;
+}
+function setCoachPortalTab(tab){state.coachPortalTab=tab;store.set('coachPortalTab',tab);render()}
+function selectCoachClient(id){state.coachClientId=id;store.set('coachClientId',id);render()}
+function coachScheduleEditor(){const client=CLIENTS.find(c=>c.id===state.coachClientId)||CLIENTS[0],schedule=state.coachSchedules[client.id]||BASE_SCHEDULE;return `<div class="portal-toolbar"><label>Klant<select onchange="selectCoachClient(this.value)">${CLIENTS.map(c=>`<option value="${c.id}" ${c.id===client.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label><button class="secondary" onclick="state.activeClientId='${client.id}';store.set('activeClientId',state.activeClientId);goToTab('weeks')">Bekijk als klant</button></div><div class="schedule-editor">${schedule.map((d,i)=>`<article><div class="portal-day"><span>${WEEK_DAYS[i].slice(0,2)}</span><b>${WEEK_DAYS[i]}</b></div><select id="scheduleType${i}"><option ${d.type==='Training'?'selected':''}>Training</option><option ${d.type==='Rust'?'selected':''}>Rust</option><option ${d.type==='Herstel'?'selected':''}>Herstel</option><option ${d.type==='Conditie'?'selected':''}>Conditie</option></select><input id="scheduleTitle${i}" value="${esc(d.title)}" aria-label="Titel ${WEEK_DAYS[i]}"><input id="scheduleNote${i}" value="${esc(d.note)}" aria-label="Notitie ${WEEK_DAYS[i]}"></article>`).join('')}</div><button class="primary portal-save" onclick="saveClientSchedule()">Weekplanning opslaan voor ${esc(client.name)}</button>`}
+function saveClientSchedule(){const id=state.coachClientId;state.coachSchedules[id]=WEEK_DAYS.map((_,i)=>({type:$(`#scheduleType${i}`).value,title:$(`#scheduleTitle${i}`).value.trim()||'Nog in te vullen',note:$(`#scheduleNote${i}`).value.trim()}));store.set('coachSchedules',state.coachSchedules);render();toast('Weekplanning opgeslagen voor deze klant')}
+function goalTemplateChanged(value){const templates={sleep:['sleep','Gemiddeld 8 uur slapen',8,'uur','per nacht'],training:['training','4 trainingen afronden',4,'trainingen','deze week'],steps:['custom','10.000 stappen per dag',7,'dagen','deze week'],water:['custom','2 liter water per dag',7,'dagen','deze week'],custom:['custom','Eigen doel',1,'keer','deze week']},t=templates[value]||templates.custom;$('#goalType').value=t[0];$('#goalTitle').value=t[1];$('#goalTarget').value=t[2];$('#goalUnit').value=t[3];$('#goalPeriod').value=t[4]}
+function addCoachGoal(){const title=$('#goalTitle')?.value.trim(),target=Math.max(.5,+$('#goalTarget')?.value||0),unit=$('#goalUnit')?.value.trim(),period=$('#goalPeriod')?.value.trim(),type=$('#goalType')?.value||'custom';if(!title||!unit||!target)return;const id=state.coachClientId;state.coachGoals[id]=[...(state.coachGoals[id]||[]),{id:`goal-${Date.now()}`,type,title,target,unit,period,current:0}];store.set('coachGoals',state.coachGoals);render();toast('Doel toegevoegd aan klant')}
+function removeCoachGoal(goalId){const id=state.coachClientId;state.coachGoals[id]=(state.coachGoals[id]||[]).filter(g=>g.id!==goalId);store.set('coachGoals',state.coachGoals);render();toast('Doel verwijderd')}
+function coachGoalsEditor(){const client=CLIENTS.find(c=>c.id===state.coachClientId)||CLIENTS[0],goals=state.coachGoals[client.id]||[];return `<div class="portal-toolbar"><label>Klant<select onchange="selectCoachClient(this.value)">${CLIENTS.map(c=>`<option value="${c.id}" ${c.id===client.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select></label><button class="secondary" onclick="state.activeClientId='${client.id}';store.set('activeClientId',state.activeClientId);goToTab('weeks')">Bekijk doelen als klant</button></div><section class="goal-builder"><div><span class="card-label">Nieuw doel</span><h3>Doel toevoegen voor ${esc(client.name)}</h3></div><div class="goal-builder-grid"><label>Snel kiezen<select onchange="goalTemplateChanged(this.value)"><option value="sleep">8 uur slaap</option><option value="training">4 trainingen per week</option><option value="steps">10.000 stappen</option><option value="water">2 liter water</option><option value="custom">Eigen doel</option></select></label><input id="goalType" type="hidden" value="sleep"><label>Naam<input id="goalTitle" value="Gemiddeld 8 uur slapen"></label><label>Doel<input id="goalTarget" type="number" step="0.5" value="8"></label><label>Eenheid<input id="goalUnit" value="uur"></label><label>Periode<input id="goalPeriod" value="per nacht"></label><button onclick="addCoachGoal()">Doel toevoegen</button></div></section><div class="section-head"><div><h2>Actieve doelen</h2><p>${goals.length} ingesteld voor deze klant</p></div></div><div class="coach-goal-list">${goals.length?goals.map(g=>`<article><div class="goal-icon">${g.type==='sleep'?'☾':g.type==='training'?'◇':'◎'}</div><div><b>${esc(g.title)}</b><span>${g.target} ${esc(g.unit)} · ${esc(g.period||'deze week')}</span></div><button onclick="removeCoachGoal('${g.id}')" aria-label="Verwijder doel">×</button></article>`).join(''):'<div class="empty">Nog geen doelen ingesteld.</div>'}</div>`}
+function editingPlan(){return state.trainingPlans.find(p=>p.id===state.editingPlanId)||state.trainingPlans[0]}
+function selectTrainingPlan(id){state.editingPlanId=id;render()}
+function createTrainingPlan(){const id='plan-'+Date.now();state.trainingPlans.push({id,title:'Nieuw trainingsschema',description:'Persoonlijk schema',sessions:[{day:'Maandag',title:'Training 1',exercises:[{name:'Nieuwe oefening',sets:3,reps:'10',method:'normal'}]}]});state.editingPlanId=id;render()}
+function setPlanField(field,value){const p=editingPlan();p[field]=value}
+function setSessionField(si,field,value){editingPlan().sessions[si][field]=value}
+function setExerciseField(si,ei,field,value){const e=editingPlan().sessions[si].exercises[ei];e[field]=field==='sets'?Math.max(1,+value||1):value}
+function addPlanSession(){editingPlan().sessions.push({day:'Maandag',title:'Nieuwe training',exercises:[{name:'Nieuwe oefening',sets:3,reps:'10',method:'normal'}]});render()}
+function addPlanExercise(si){editingPlan().sessions[si].exercises.push({name:'Nieuwe oefening',sets:3,reps:'10',method:'normal'});render()}
+function removePlanExercise(si,ei){editingPlan().sessions[si].exercises.splice(ei,1);render()}
+function trainingPlanEditor(){const p=editingPlan();if(!p)return'';return `<div class="portal-toolbar"><label>Schema<select onchange="selectTrainingPlan(this.value)">${state.trainingPlans.map(x=>`<option value="${x.id}" ${x.id===p.id?'selected':''}>${esc(x.title)}</option>`).join('')}</select></label><button class="secondary" onclick="createTrainingPlan()">＋ Nieuw schema</button></div><section class="plan-builder-head"><label>Naam schema<input value="${esc(p.title)}" oninput="setPlanField('title',this.value)"></label><label>Omschrijving<input value="${esc(p.description)}" oninput="setPlanField('description',this.value)"></label></section><div class="builder-sessions">${p.sessions.map((s,si)=>`<section class="builder-session"><div class="builder-session-head"><select onchange="setSessionField(${si},'day',this.value)">${WEEK_DAYS.map(d=>`<option ${d===s.day?'selected':''}>${d}</option>`).join('')}</select><input value="${esc(s.title)}" oninput="setSessionField(${si},'title',this.value)" aria-label="Naam training"></div><div class="builder-exercises">${s.exercises.map((e,ei)=>`<div class="builder-exercise"><span>${ei+1}</span><input value="${esc(e.name)}" oninput="setExerciseField(${si},${ei},'name',this.value)" aria-label="Oefening"><label><input type="number" min="1" value="${e.sets}" oninput="setExerciseField(${si},${ei},'sets',this.value)"> sets</label><label><input value="${esc(e.reps)}" oninput="setExerciseField(${si},${ei},'reps',this.value)"> reps</label><select onchange="setExerciseField(${si},${ei},'method',this.value)"><option value="normal" ${e.method==='normal'?'selected':''}>Normale sets</option><option value="superset-a" ${e.method==='superset-a'?'selected':''}>Superset A (zelfde groep)</option><option value="superset-b" ${e.method==='superset-b'?'selected':''}>Superset B (zelfde groep)</option><option value="cluster" ${e.method==='cluster'?'selected':''}>Cluster 6×6 · 10 sec</option></select><button onclick="removePlanExercise(${si},${ei})" aria-label="Verwijder oefening">×</button></div>`).join('')}</div><p class="builder-help">Geef twee oefeningen dezelfde supersetletter om ze direct aan elkaar te koppelen.</p><button class="builder-add" onclick="addPlanExercise(${si})">＋ Oefening toevoegen</button></section>`).join('')}</div><button class="builder-add session-add" onclick="addPlanSession()">＋ Trainingsdag toevoegen</button><section class="assignment-card"><div><span class="card-label">Toewijzen</span><h3>Koppel dit schema aan klanten</h3></div><div class="client-checks">${CLIENTS.map(c=>`<label><input type="checkbox" data-assign-client="${c.id}" ${state.clientPlanAssignments[c.id]===p.id?'checked':''}><span><b>${esc(c.name)}</b><small>${esc(c.goal)}</small></span></label>`).join('')}</div></section><button class="primary portal-save" onclick="saveTrainingPlan()">Schema opslaan en toewijzen</button>`}
+function saveTrainingPlan(){const p=editingPlan();document.querySelectorAll('[data-assign-client]').forEach(cb=>{if(cb.checked)state.clientPlanAssignments[cb.dataset.assignClient]=p.id;else if(state.clientPlanAssignments[cb.dataset.assignClient]===p.id)delete state.clientPlanAssignments[cb.dataset.assignClient]});store.set('trainingPlans',state.trainingPlans);store.set('clientPlanAssignments',state.clientPlanAssignments);render();toast('Trainingsschema opgeslagen en toegewezen')}
+function coachPortal(){return `<div class="portal-head"><div><span class="card-label">Alleen voor coaches</span><h2>Coachportaal</h2><p>Beheer per klant planning, doelen en persoonlijke trainingsschema's.</p></div></div><div class="portal-tabs"><button class="${state.coachPortalTab==='schedule'?'active':''}" onclick="setCoachPortalTab('schedule')">Weekplanning</button><button class="${state.coachPortalTab==='goals'?'active':''}" onclick="setCoachPortalTab('goals')">Doelen</button><button class="${state.coachPortalTab==='plans'?'active':''}" onclick="setCoachPortalTab('plans')">Trainingsschema's</button></div>${state.coachPortalTab==='schedule'?coachScheduleEditor():state.coachPortalTab==='goals'?coachGoalsEditor():trainingPlanEditor()}`}
+function activeNutritionPlan(){return state.coachNutritionPlans[state.activeClientId]||state.macroPlan}
+function macroCalories(plan=activeNutritionPlan()){return Math.round(plan.carbs*4+plan.protein*4+plan.fat*9)}
+function foodLogForDay(){return state.foodLog.filter(x=>x.date===state.nutritionDate)}
+function foodTotals(items=foodLogForDay()){return items.reduce((t,x)=>({kcal:t.kcal+x.kcal,carbs:t.carbs+x.carbs,protein:t.protein+x.protein,fat:t.fat+x.fat}),{kcal:0,carbs:0,protein:0,fat:0})}
+function foodForMeal(meal){return foodLogForDay().filter(x=>(x.meal||'breakfast')===meal)}
+function openNutritionMeal(meal){state.activeMeal=meal;store.set('activeMeal',meal);state.productResults=[];render()}
+function closeNutritionMeal(){state.activeMeal=null;store.set('activeMeal',null);state.productResults=[];render()}
+function changeNutritionDate(value){state.nutritionDate=value;store.set('nutritionDate',value);state.activeMeal=null;store.set('activeMeal',null);render()}
+function macroProgressItem(label,value,target,color){const pct=Math.min(100,Math.round(value/Math.max(1,target)*100));return `<div class="macro-progress-item"><div><span>${label}</span><b>${Math.round(value)} / ${target} g</b></div><div class="macro-line"><i style="width:${pct}%;background:${color}"></i></div></div>`}
+function setProductRetailer(retailer){state.productRetailer=retailer;store.set('productRetailer',retailer);state.productResults=[];render()}
+function setProductTargetMeal(meal){state.productTargetMeal=meal;store.set('productTargetMeal',meal);render()}
+function setNutritionView(view){state.nutritionView=['diary','recipes','products'].includes(view)?view:'diary';if(view!=='diary')state.activeMeal=null;store.set('nutritionView',state.nutritionView);store.set('activeMeal',state.activeMeal);render()}
+function nutritionNav(){return `<div class="nutrition-sections"><button class="${state.nutritionView==='diary'?'active':''}" onclick="setNutritionView('diary')"><span>◉</span>Dagboek</button><button class="${state.nutritionView==='products'?'active':''}" onclick="setNutritionView('products')"><span>▦</span>Product scannen</button><button class="${state.nutritionView==='recipes'?'active':''}" onclick="setNutritionView('recipes')"><span>▤</span>Recepten</button></div>`}
+function productMacros(p){const n=p.nutriments||{};return {kcal:+(n['energy-kcal_100g']??n['energy-kcal']??0),carbs:+(n.carbohydrates_100g??0),protein:+(n.proteins_100g??0),fat:+(n.fat_100g??0)}}
+function supermarketProductSearch(){
+  const shops=['Albert Heijn','Picnic','Lidl','Dirk'];
+  const results=state.productResults.map((p,i)=>{const m=productMacros(p),name=p.product_name||p.product_name_nl||'Onbekend product';return `<article class="product-result"><img src="${esc(p.image_front_small_url||'Screenshot 2026-04-08 162514.png')}" alt="" loading="lazy"><div><b>${esc(name)}</b><span>${esc(p.brands||state.productRetailer)}${p.code?` · ${esc(p.code)}`:''}</span><div class="product-macros"><span>${Math.round(m.kcal)} kcal</span><span>${m.carbs.toFixed(1)} g kh</span><span>${m.protein.toFixed(1)} g eiwit</span><span>${m.fat.toFixed(1)} g vet</span></div></div><label><input id="remoteGrams${i}" type="number" min="1" value="100"><span>g</span></label><button onclick="addExternalFood(${i})">Toevoegen</button></article>`}).join('');
+  return `<section class="nutrition-card supermarket-card"><div class="nutrition-card-head"><div><span class="card-label">Supermarktproducten</span><h2>Zoek of scan een product</h2></div><span class="data-source">Bron: Open Food Facts</span></div><div class="retailer-tabs">${shops.map(s=>`<button class="${state.productRetailer===s?'active':''}" onclick="setProductRetailer('${s}')">${s}</button>`).join('')}</div><form class="product-search" onsubmit="searchSupermarketProducts(event)"><input id="productQuery" autocomplete="off" inputmode="search" placeholder="Productnaam of barcode" aria-label="Productnaam of barcode"><button ${state.productLoading?'disabled':''}>${state.productLoading?'Zoeken…':'Zoeken'}</button><label class="barcode-scan">▦ Scan etiket<input type="file" accept="image/*" capture="environment" onchange="scanBarcodeImage(this)"></label></form><p class="source-note">Productgegevens komen uit een openbare database en kunnen afwijken. Controleer de verpakking voordat je het product toevoegt.</p><div class="product-results">${results||(!state.productLoading?'<div class="empty compact">Zoek op naam, typ een barcode of maak een foto van de barcode.</div>':'<div class="empty compact">Producten ophalen…</div>')}</div></section>`;
+}
+async function scanBarcodeImage(input){
+  const file=input.files?.[0];if(!file)return;
+  if(!('BarcodeDetector' in window)){toast('Automatisch scannen wordt niet ondersteund. Typ de cijfers onder de barcode.');return}
+  try{const detector=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e']}),bitmap=await createImageBitmap(file),codes=await detector.detect(bitmap);bitmap.close();const code=codes[0]?.rawValue;if(!code){toast('Geen barcode gevonden. Probeer dichterbij en met goed licht.');return}const field=$('#productQuery');if(field)field.value=code;await searchSupermarketProducts()}
+  catch(error){console.error(error);toast('Barcode kon niet worden gelezen. Typ de cijfers onder de barcode.')}
+}
+async function searchSupermarketProducts(event){
+  event?.preventDefault();const q=$('#productQuery')?.value.trim();if(!q)return;
+  state.productLoading=true;render();
+  try{
+    let products=[];
+    if(/^\d{8,14}$/.test(q)){
+      const res=await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(q)}.json?fields=code,product_name,product_name_nl,brands,stores,nutriments,image_front_small_url`,{signal:AbortSignal.timeout(9000)});const js=await res.json();if(js.status===1&&js.product)products=[js.product];
+    }else{
+      const localTerm=normalizeFoodTerm(q),local=FOOD_DB.filter(f=>normalizeFoodTerm(f.name).includes(localTerm)||localTerm.includes(normalizeFoodTerm(f.name))).map(f=>({code:`local-${f.id}`,product_name:f.name,brands:'Karada productdatabase',stores:'Lokale database',nutriments:{'energy-kcal_100g':f.kcal,carbohydrates_100g:f.carbs,proteins_100g:f.protein,fat_100g:f.fat}}));
+      const url=`https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}&search_simple=1&action=process&json=1&page_size=20&fields=code,product_name,product_name_nl,brands,stores,nutriments,image_front_small_url`;
+      let remote=[];try{const res=await fetch(url,{signal:AbortSignal.timeout(9000)}),js=await res.json();remote=(js.products||[]).filter(p=>p.product_name&&(p.nutriments?.['energy-kcal_100g']!=null||p.nutriments?.energy_100g!=null));const storeMatches=remote.filter(p=>`${p.stores||''} ${p.brands||''}`.toLowerCase().includes(state.productRetailer.toLowerCase()));if(storeMatches.length)remote=storeMatches.concat(remote.filter(p=>!storeMatches.includes(p)))}catch(error){console.warn('Open Food Facts niet bereikbaar; lokale database wordt gebruikt.',error)}
+      products=[...local,...remote];
+    }
+    state.productResults=products.filter((p,i,list)=>list.findIndex(x=>x.code===p.code)===i).slice(0,12);if(!state.productResults.length)toast('Geen passend product gevonden; probeer de barcode of kies een lokaal product');
+  }catch(error){console.error(error);state.productResults=[];toast('Productdatabase is tijdelijk niet bereikbaar')}
+  state.productLoading=false;render();
+}
+function addExternalFood(index){const p=state.productResults[index],grams=Math.max(1,+$(`#remoteGrams${index}`)?.value||100);if(!p)return;const m=productMacros(p),factor=grams/100,name=p.product_name||p.product_name_nl||'Supermarktproduct',meal=state.activeMeal||state.productTargetMeal||'breakfast';state.foodLog.push({id:Date.now(),date:state.nutritionDate,meal,foodId:p.code||`external-${Date.now()}`,name,grams,kcal:m.kcal*factor,carbs:m.carbs*factor,protein:m.protein*factor,fat:m.fat*factor,source:'Open Food Facts'});store.set('foodLog',state.foodLog);render();toast(`${name} toegevoegd aan ${MEAL_SLOTS.find(x=>x.id===meal)?.label||'je dagboek'}`)}
+function saveCustomRecipe(){
+  const name=$('#customRecipeName')?.value.trim(),source=$('#customRecipeSource')?.value||'Eigen recept',rawUrl=$('#customRecipeUrl')?.value.trim(),url=/^https?:\/\//i.test(rawUrl||'')?rawUrl:'',kcal=Math.max(0,+$('#customRecipeKcal')?.value||0),carbs=Math.max(0,+$('#customRecipeCarbs')?.value||0),protein=Math.max(0,+$('#customRecipeProtein')?.value||0),fat=Math.max(0,+$('#customRecipeFat')?.value||0);if(!name||!kcal){toast('Vul minimaal een naam en calorieën per portie in');return}state.customRecipes.unshift({id:`custom-${Date.now()}`,name,source,url,kcal,carbs,protein,fat});store.set('customRecipes',state.customRecipes);render();toast('Recept opgeslagen')
+}
+function addCustomRecipeToMeal(id){const r=state.customRecipes.find(x=>x.id===id),meal=$('#recipeTargetMeal')?.value||'dinner';if(!r)return;state.foodLog.push({id:Date.now(),date:state.nutritionDate,meal,foodId:r.id,name:r.name,grams:1,kcal:r.kcal,carbs:r.carbs,protein:r.protein,fat:r.fat,source:r.source});store.set('foodLog',state.foodLog);render();toast(`${r.name} toegevoegd aan ${MEAL_SLOTS.find(x=>x.id===meal)?.label}`)}
+function deleteCustomRecipe(id){state.customRecipes=state.customRecipes.filter(x=>x.id!==id);store.set('customRecipes',state.customRecipes);render()}
+function recipeSources(){return `<section class="recipe-sources"><div class="section-head"><div><span class="card-label">Officiële receptbronnen</span><h2>Vind een recept bij de aanbieder</h2><p>Open het originele recept en sla daarna jouw portie en macro's op in Karada.</p></div></div><div class="recipe-source-grid"><a href="https://www.hellofresh.nl/recipes" target="_blank" rel="noreferrer"><b>HelloFresh</b><span>Bekijk officiële recepten ↗</span></a><a href="https://picnic.app/nl/recepten/" target="_blank" rel="noreferrer"><b>Picnic</b><span>Bekijk officiële recepten ↗</span></a><a href="https://www.ah.nl/allerhande/recepten-zoeken?page=1" target="_blank" rel="noreferrer"><b>Albert Heijn</b><span>Bekijk Allerhande ↗</span></a></div><p class="source-note">Deze aanbieders hebben geen openbare koppeling beschikbaar gesteld voor het kopiëren van hun volledige receptenbestand. Recepten blijven daarom bij de officiële bron.</p></section>`}
+function customRecipeHub(){const cards=state.customRecipes.map(r=>`<article class="saved-recipe"><div><span>${esc(r.source)}</span><h3>${esc(r.name)}</h3><p>${Math.round(r.kcal)} kcal · ${r.carbs}g kh · ${r.protein}g eiwit · ${r.fat}g vet per portie</p>${r.url?`<a href="${esc(r.url)}" target="_blank" rel="noreferrer">Open bron ↗</a>`:''}</div><div><button onclick="addCustomRecipeToMeal('${r.id}')">Toevoegen</button><button class="icon-delete" onclick="deleteCustomRecipe('${r.id}')" aria-label="Verwijder recept">×</button></div></article>`).join('');return `${recipeSources()}<section class="custom-recipe-form"><div><span class="card-label">Eigen bibliotheek</span><h2>Recept toevoegen</h2><p>Kopieer geen volledige databank. Sla een recept op dat je zelf gebruikt en vul de macro's per portie in.</p></div><div class="recipe-form-grid"><label>Naam<input id="customRecipeName" placeholder="Bijv. kip met rijst"></label><label>Bron<select id="customRecipeSource"><option>Eigen recept</option><option>HelloFresh</option><option>Picnic</option><option>Albert Heijn</option></select></label><label class="wide">Link naar origineel<input id="customRecipeUrl" type="url" placeholder="https://..."></label><label>kcal<input id="customRecipeKcal" type="number" min="0"></label><label>Koolhydraten (g)<input id="customRecipeCarbs" type="number" min="0"></label><label>Eiwit (g)<input id="customRecipeProtein" type="number" min="0"></label><label>Vet (g)<input id="customRecipeFat" type="number" min="0"></label><button onclick="saveCustomRecipe()">Recept opslaan</button></div></section><section><div class="recipe-target"><label>Voeg recepten toe aan<select id="recipeTargetMeal">${MEAL_SLOTS.map(x=>`<option value="${x.id}">${x.label}</option>`).join('')}</select></label></div><div class="saved-recipes">${cards||'<div class="empty compact">Je hebt nog geen eigen recepten opgeslagen.</div>'}</div></section><div class="section-head"><div><h2>Karada-recepten</h2><p>Zoek in de algemene receptenbibliotheek.</p></div></div>${recipeLibrary()}`}
+function standaloneProductHub(){return `<section class="product-target"><label>Voeg het product toe aan<select onchange="setProductTargetMeal(this.value)">${MEAL_SLOTS.map(x=>`<option value="${x.id}" ${x.id===state.productTargetMeal?'selected':''}>${x.label}</option>`).join('')}</select></label></section>${supermarketProductSearch()}`}
+const FOOD_ALIASES={
+  havermout:'havermout',oats:'havermout',whey:'whey','whey eiwit':'whey','eiwitpoeder':'whey','proteinepoeder':'whey',
+  'donkere chocola':'pure-chocolade','donkere chocolade':'pure-chocolade','pure chocola':'pure-chocolade','pure chocolade':'pure-chocolade',
+  kwark:'kwark','magere kwark':'kwark',banaan:'banaan',rijst:'rijst','witte rijst':'rijst',kip:'kip',kipfilet:'kip',zalm:'zalm',ei:'ei',eieren:'ei',
+  brood:'brood','volkoren brood':'brood','volkorenbrood':'brood',pindakaas:'pindakaas',aardappel:'aardappel',avocado:'avocado',olijfolie:'olijfolie',
+  melk:'melk','halfvolle melk':'melk',yoghurt:'griekse-yoghurt','griekse yoghurt':'griekse-yoghurt',muesli:'muesli',pasta:'volkoren-pasta','volkoren pasta':'volkoren-pasta',
+  gehakt:'rundergehakt','rundergehakt':'rundergehakt',tofu:'tofu',broccoli:'broccoli',appel:'appel'
+};
+function normalizeFoodTerm(value){return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\b(gekookt|bereid|rauw|ongezoet|gram|gr)\b/g,' ').replace(/\s+/g,' ').trim()}
+function parseMealSentence(text){
+  const parts=String(text).replace(/\s+en\s+(?=\d)/gi,',').split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean),matched=[],unmatched=[];
+  for(const part of parts){const hit=part.match(/^(\d+(?:[.,]\d+)?)\s*(?:g|gr|gram)\s+(.+)$/i);if(!hit){unmatched.push(part);continue}const grams=+hit[1].replace(',','.'),term=normalizeFoodTerm(hit[2]),alias=FOOD_ALIASES[term]||Object.entries(FOOD_ALIASES).find(([name])=>term.includes(name))?.[1],food=FOOD_DB.find(x=>x.id===alias);if(!food){unmatched.push(hit[2]);continue}const factor=grams/100;matched.push({food,grams,kcal:food.kcal*factor,carbs:food.carbs*factor,protein:food.protein*factor,fat:food.fat*factor})}
+  return {matched,unmatched};
+}
+function mealSentenceSummary(parsed){const t=parsed.matched.reduce((sum,x)=>({kcal:sum.kcal+x.kcal,carbs:sum.carbs+x.carbs,protein:sum.protein+x.protein,fat:sum.fat+x.fat}),{kcal:0,carbs:0,protein:0,fat:0});return parsed.matched.length?`<b>${Math.round(t.kcal)} kcal</b><span>${t.carbs.toFixed(1)} g kh · ${t.protein.toFixed(1)} g eiwit · ${t.fat.toFixed(1)} g vet</span>${parsed.unmatched.length?`<small>Niet herkend: ${esc(parsed.unmatched.join(', '))}</small>`:''}`:'<span>Nog geen herkenbare producten gevonden.</span>'}
+function previewMealSentence(){const box=$('#mealSentencePreview'),input=$('#mealSentence');if(box&&input)box.innerHTML=mealSentenceSummary(parseMealSentence(input.value))}
+function addMealSentence(){const input=$('#mealSentence'),parsed=parseMealSentence(input?.value||'');if(!parsed.matched.length){toast('Geen producten herkend. Gebruik bijvoorbeeld: 20 g havermout, 30 g whey');return}const meal=state.activeMeal||'breakfast';parsed.matched.forEach((x,i)=>state.foodLog.push({id:Date.now()+i,date:state.nutritionDate,meal,foodId:x.food.id,name:x.food.name,grams:x.grams,kcal:x.kcal,carbs:x.carbs,protein:x.protein,fat:x.fat,source:'Snelle invoer'}));store.set('foodLog',state.foodLog);render();toast(`${parsed.matched.length} producten toegevoegd aan ${MEAL_SLOTS.find(x=>x.id===meal)?.label}`)}
+function nutritionHub(){
+  const plan=activeNutritionPlan(),kcal=macroCalories(plan),items=foodLogForDay(),totals=foodTotals(items);
+  const coachPlanCard=`<section class="coach-nutrition-target"><div><span class="card-label">Ingesteld door je coach</span><h3>Jouw dagelijkse voedingsdoel</h3><p>${plan.note?esc(plan.note):'Gebruik de zes eetmomenten om je voeding over de dag te verdelen.'}</p></div><div class="coach-target-values"><span><b>${plan.carbs}</b> g koolhydraten</span><span><b>${plan.protein}</b> g eiwit</span><span><b>${plan.fat}</b> g vet</span><strong>${kcal.toLocaleString('nl-NL')} kcal</strong></div></section>`;
+  const nav=nutritionNav();
+  if(state.nutritionView==='recipes')return nav+customRecipeHub();
+  if(state.nutritionView==='products')return nav+standaloneProductHub();
+  const summary=`<section class="nutrition-card intake-card"><div class="intake-head"><div><span class="card-label">Voedingsdagboek</span><h2>${new Date(state.nutritionDate+'T12:00:00').toLocaleDateString('nl-NL',{weekday:'long',day:'numeric',month:'long'})}</h2></div><input class="date-control nutrition-date" type="date" value="${state.nutritionDate}" onchange="changeNutritionDate(this.value)"></div><div class="nutrition-energy"><strong>${Math.round(totals.kcal).toLocaleString('nl-NL')}</strong><span> / ${kcal.toLocaleString('nl-NL')} kcal</span></div><div class="macro-progress-list">${macroProgressItem('Koolhydraten',totals.carbs,plan.carbs,'var(--pink)')}${macroProgressItem('Eiwitten',totals.protein,plan.protein,'var(--blue)')}${macroProgressItem('Vetten',totals.fat,plan.fat,'var(--orange)')}</div></section>`;
+  if(!state.activeMeal){
+    const remaining={carbs:Math.max(0,plan.carbs-totals.carbs),protein:Math.max(0,plan.protein-totals.protein),fat:Math.max(0,plan.fat-totals.fat)};
+    const meals=`<section class="meal-learning"><div class="section-head"><div><span class="card-label">Leer je macro's verdelen</span><h2>Zes eetmomenten</h2><p>Open een eetmoment, voeg producten toe en zie wat er overblijft voor de rest van de dag.</p></div></div><div class="meal-slot-list">${MEAL_SLOTS.map((slot,index)=>{const mealItems=foodForMeal(slot.id),mealTotal=foodTotals(mealItems);return `<button onclick="openNutritionMeal('${slot.id}')"><span class="meal-slot-icon">${slot.icon}</span><div><b>${slot.label}</b><small>${mealItems.length?`${mealItems.length} ${mealItems.length===1?'product':'producten'} · ${Math.round(mealTotal.kcal)} kcal`:'Nog niets ingevuld'}</small></div><div class="meal-slot-macros"><span>${Math.round(mealTotal.carbs)}g kh</span><span>${Math.round(mealTotal.protein)}g eiwit</span><span>${Math.round(mealTotal.fat)}g vet</span></div><strong>›</strong></button>`}).join('')}</div><div class="remaining-day"><b>Nog te verdelen vandaag</b><span>${Math.round(remaining.carbs)} g koolhydraten · ${Math.round(remaining.protein)} g eiwit · ${Math.round(remaining.fat)} g vet</span></div></section>`;
+    return nav+summary+coachPlanCard+meals;
+  }
+  const slot=MEAL_SLOTS.find(x=>x.id===state.activeMeal)||MEAL_SLOTS[0],mealItems=foodForMeal(slot.id),mealTotal=foodTotals(mealItems),slotIndex=MEAL_SLOTS.findIndex(x=>x.id===slot.id),mealsAfter=Math.max(0,MEAL_SLOTS.length-slotIndex-1),remaining={carbs:Math.max(0,plan.carbs-totals.carbs),protein:Math.max(0,plan.protein-totals.protein),fat:Math.max(0,plan.fat-totals.fat)},divider=Math.max(1,mealsAfter);
+  const mealGuidance=plan.meals?.[slot.id];
+  const coach=`<section class="meal-coach"><button onclick="closeNutritionMeal()">‹ Alle eetmomenten</button><span class="card-label">${slot.label}</span><h2>${Math.round(mealTotal.carbs)} g koolhydraten gegeten</h2>${mealGuidance?`<div class="coach-meal-note"><b>Tip van je coach</b><span>${esc(mealGuidance)}</span></div>`:''}<p>Na dit eetmoment heb je nog <b>${Math.round(remaining.carbs)} g koolhydraten</b>, <b>${Math.round(remaining.protein)} g eiwit</b> en <b>${Math.round(remaining.fat)} g vet</b> over.</p><div class="macro-lesson"><div><span>Resterende eetmomenten</span><b>${mealsAfter}</b></div><div><span>Richtlijn per resterende maaltijd</span><b>${Math.round(remaining.carbs/divider)}g kh · ${Math.round(remaining.protein/divider)}g eiwit · ${Math.round(remaining.fat/divider)}g vet</b></div></div><small>Je voert hier alleen in wat je hebt gegeten. Alleen je coach kan het dagdoel aanpassen.</small></section>`;
+  const quickEntry=`<section class="meal-sentence-card"><div><span class="card-label">Snel toevoegen aan ${slot.label}</span><h2>Beschrijf wat je hebt gegeten</h2><p>Gebruik grammen per product. De app rekent de macro's automatisch uit.</p></div><textarea id="mealSentence" oninput="previewMealSentence()" placeholder="Bijv. 20 g havermout, 30 g whey en 20 g pure chocolade"></textarea><div id="mealSentencePreview" class="meal-sentence-preview"><span>Vul je maaltijd hierboven in.</span></div><button onclick="addMealSentence()">Berekenen en toevoegen</button></section>`;
+  const picker=`<section class="nutrition-card food-picker"><div><span class="card-label">Toevoegen aan ${slot.label}</span><h2>Kies een product</h2></div><div class="food-add-row"><select id="foodSelect" aria-label="Kies een product">${FOOD_DB.map(f=>`<option value="${f.id}">${f.name} · ${f.kcal} kcal per 100 g</option>`).join('')}</select><label><input id="foodGrams" type="number" min="1" value="30"><span>gram</span></label><button onclick="addFoodItem()">Toevoegen</button></div><p class="food-example">De hoeveelheid wordt direct omgerekend en van je dagdoel afgetrokken.</p></section>`;
+  const log=`<section><div class="section-head"><div><h2>In ${slot.label.toLowerCase()}</h2><p>${mealItems.length} ${mealItems.length===1?'product':'producten'}</p></div></div><div class="list-card food-log">${mealItems.length?mealItems.map(x=>`<div class="food-log-row"><div><b>${esc(x.name)}</b><span>${x.grams} g · ${Math.round(x.kcal)} kcal${x.source?` · ${esc(x.source)}`:''}</span></div><div class="food-log-macros"><span>${x.carbs.toFixed(1)} g kh</span><span>${x.protein.toFixed(1)} g eiwit</span><span>${x.fat.toFixed(1)} g vet</span></div><button onclick="removeFoodItem(${x.id})" aria-label="Verwijder ${esc(x.name)}">×</button></div>`).join(''):'<div class="empty">Nog geen producten toegevoegd aan dit eetmoment.</div>'}</div></section>`;
+  return nav+coach+quickEntry+picker+supermarketProductSearch()+log;
+}
+function updateMacroPreview(){const c=Math.max(0,+($('#macroCarbs')?.value||0)),p=Math.max(0,+($('#macroProtein')?.value||0)),f=Math.max(0,+($('#macroFat')?.value||0));const el=$('#macroKcal');if(el)el.textContent=`${Math.round(c*4+p*4+f*9).toLocaleString('nl-NL')} kcal`}
+function saveMacroPlan(){const carbs=Math.max(0,Math.round(+$('#macroCarbs').value||0)),protein=Math.max(0,Math.round(+$('#macroProtein').value||0)),fat=Math.max(0,Math.round(+$('#macroFat').value||0));state.macroPlan={carbs,protein,fat};store.set('macroPlan',state.macroPlan);render();toast(`Macroplan opgeslagen: ${macroCalories().toLocaleString('nl-NL')} kcal`)}
+function setNutritionMode(mode){state.nutritionMode=mode==='recipes'?'recipes':'self';if(state.nutritionMode==='recipes')state.activeMeal=null;store.set('nutritionMode',state.nutritionMode);store.set('activeMeal',state.activeMeal);render()}
+function addFoodItem(){const food=FOOD_DB.find(x=>x.id===$('#foodSelect').value),grams=Math.max(1,+$('#foodGrams').value||0);if(!food)return;const factor=grams/100;state.foodLog.push({id:Date.now(),date:state.nutritionDate,meal:state.activeMeal||'breakfast',foodId:food.id,name:food.name,grams,kcal:food.kcal*factor,carbs:food.carbs*factor,protein:food.protein*factor,fat:food.fat*factor});store.set('foodLog',state.foodLog);render();toast(`${grams} g ${food.name.toLowerCase()} toegevoegd aan ${MEAL_SLOTS.find(x=>x.id===(state.activeMeal||'breakfast'))?.label||'ontbijt'}`)}
+function removeFoodItem(id){state.foodLog=state.foodLog.filter(x=>x.id!==id);store.set('foodLog',state.foodLog);render()}
+function syncNav(){const secondary=['weeks','checkin','longevity','courses','shopping','profile'];document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===state.tab||(b.dataset.tab==='more'&&secondary.includes(state.tab))))}
+window.goToTab=function(tab){if(tab==='coachportal')tab='home';if(tab==='recipes'){state.nutritionView='recipes';store.set('nutritionView','recipes');tab='diary'}state.tab=tab;closeMoreMenu();render()}
+window.openMoreMenu=function(){const o=$('#moreOverlay');o.classList.add('open');o.setAttribute('aria-hidden','false');document.body.classList.add('sheet-open')}
+window.closeMoreMenu=function(){const o=$('#moreOverlay');if(!o)return;o.classList.remove('open');o.setAttribute('aria-hidden','true');document.body.classList.remove('sheet-open')}
+function bindNav(){document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>b.dataset.tab==='more'?openMoreMenu():goToTab(b.dataset.tab))}
+
+function chooseMeal(m,i){const k=key(m);if(state.choices[k]===i){delete state.choices[k];store.set('choices',state.choices);render();toast('Maaltijd gedeselecteerd');return}state.choices[k]=i;store.set('choices',state.choices);render();toast('Maaltijd gekozen')}function clearMeal(m){delete state.choices[key(m)];store.set('choices',state.choices);render()}function changeDate(v){state.date=v;render()}function toggleShop(i){state.shopping[i].done=!state.shopping[i].done;store.set('shopping',state.shopping);render()}function addCustom(){let n=prompt('Welk product wil je toevoegen?');if(n){state.shopping.push({name:n,done:false,img:pic(n)});store.set('shopping',state.shopping);render()}}function clearShopping(){if(confirm('Boodschappenlijst leegmaken?')){state.shopping=[];store.set('shopping',[]);render()}}function saveProfile(){let w=parseFloat($('#weightInput').value),h=parseInt($('#heightInput').value),t=parseFloat($('#targetInput').value);if(w>40&&h>130){state.profile={...state.profile,weight:w,height:h,target:t};state.weights.push(w);store.set('profile',state.profile);store.set('weights',state.weights);render();toast('Profiel opgeslagen')}}
+function render(){let titles={home:'Home',diary:'Voeding',weeks:'Planning',checkin:'Check-in',longevity:'Longevity',courses:'Mijn leeromgeving',shopping:'Boodschappen',profile:'Profiel'};$('#pageTitle').textContent=titles[state.tab]||'Karada';$('#view').innerHTML=state.tab==='home'?dashboard():state.tab==='diary'?nutritionHub():state.tab==='weeks'?weeks():state.tab==='checkin'?checkIn():state.tab==='longevity'?longevity():state.tab==='courses'?courses():state.tab==='shopping'?shopping():profile();syncNav();window.scrollTo({top:0,behavior:'instant'})}
+bindNav();
+if('serviceWorker'in navigator){
+  let refreshing=false;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!refreshing){refreshing=true;location.reload()}});
+  window.addEventListener('load',async()=>{try{const registration=await navigator.serviceWorker.register('./service-worker.js?v=11',{updateViaCache:'none'});await registration.update()}catch(error){console.warn('App-update kon niet worden gecontroleerd',error)}});
+}
+render();
+
+/* Recipe database and personalised dinner modes */
+state.dinnerMode=store.get('dinnerMode','together');
+state.theme=store.get('theme','dark');
+applyTheme(state.theme);
+state.recipeDb=store.get('recipeDbNlV5',[]);
+state.recipeQuery='';
+state.recipeDiet='all';
+state.recipePage=0;
+state.openRecipe=null;
+const MEALDB_BASE='https://www.themealdb.com/api/json/v1/1';
+const TR=window.NL_RECIPE_TRANSLATOR;
+
+function normaliseMeal(m){
+  const ingredients=[];
+  for(let i=1;i<=20;i++){
+    const ing=(m['strIngredient'+i]||'').trim(), measure=(m['strMeasure'+i]||'').trim();
+    if(ing)ingredients.push(TR.ingredient(`${measure} ${ing}`.trim()));
+  }
+  const categoryRaw=(m.strCategory||'Overig').trim();
+  const category=TR.category(categoryRaw);
+  const text=`${m.strMeal||''} ${categoryRaw} ${ingredients.join(' ')}`.toLowerCase();
+  const vegetarian=categoryRaw.toLowerCase()==='vegetarian'||categoryRaw.toLowerCase()==='vegan'||/tofu|vegetable|lentil|chickpea|bean|mushroom|eggplant|aubergine|falafel|paneer/.test(text)&&!/chicken|beef|pork|lamb|turkey|fish|salmon|tuna|prawn|shrimp|bacon|ham/.test(text);
+  const seafood=categoryRaw.toLowerCase()==='seafood'||/salmon|cod|tuna|fish|prawn|shrimp|mussel/.test(text);
+  const meat=!vegetarian&&!seafood;
+  const steps=(m.strInstructions||'').split(/(?:\r?\n)+|(?<=\.)\s+(?=[A-Z0-9])/).map(x=>x.trim()).filter(x=>x.length>2);
+  return {id:m.idMeal,name:TR.title(m.strMeal||'Naamloos recept'),category,area:TR.area(m.strArea||'Internationaal'),photo:m.strMealThumb||pics.default,ingredients,steps:steps.length?steps.map(TR.instruction):[TR.instruction(m.strInstructions||'Geen bereidingswijze beschikbaar.')],source:m.strSource||'',youtube:m.strYoutube||'',vegetarian,seafood,meat};
+}
+async function loadRecipeDatabase(force=false){
+  if(state.recipeDb.length>=300&&!force)return;
+  const status=document.querySelector('#recipeStatus'); if(status)status.textContent='Recepten laden…';
+  try{
+    const letters='abcdefghijklmnopqrstuvwxyz'.split('');
+    const batches=[];
+    for(let i=0;i<letters.length;i+=5){
+      const chunk=letters.slice(i,i+5);
+      const res=await Promise.all(chunk.map(c=>fetch(`${MEALDB_BASE}/search.php?f=${c}`).then(r=>r.ok?r.json():null).catch(()=>null)));
+      batches.push(...res);
+    }
+    const map=new Map();
+    batches.forEach(js=>(js?.meals||[]).forEach(m=>map.set(m.idMeal,normaliseMeal(m))));
+    const meals=[...map.values()];
+    if(meals.length<300)throw new Error(`Slechts ${meals.length} recepten ontvangen`);
+    state.recipeDb=meals;
+    try{store.set('recipeDbNlV5',meals)}catch(e){console.warn('Recipe cache is too large; database remains available this session.',e)}
+    toast(`${meals.length} recepten geladen`);
+    render();
+  }catch(e){
+    console.error(e);
+    toast('Receptendatabase kon niet volledig laden');
+    if(status)status.textContent='Controleer je internetverbinding en probeer opnieuw.';
+  }
+}
+function applyTheme(theme){
+  const value=theme==='light'?'light':'dark';
+  document.documentElement.dataset.theme=value;
+  const meta=document.querySelector('meta[name="theme-color"]');
+  if(meta)meta.setAttribute('content',value==='light'?'#f4f6f4':'#0a0c0b');
+}
+function setTheme(theme){
+  state.theme=theme==='light'?'light':'dark';
+  store.set('theme',state.theme);
+  applyTheme(state.theme);
+  render();
+  toast(state.theme==='light'?'Lichte modus ingeschakeld':'Donkere modus ingeschakeld');
+}
+function getRecipeById(id){return state.recipeDb.find(x=>String(x.id)===String(id))||suggestedRecipes(day(),50).find(x=>String(x.id)===String(id))}
+function recipeShareText(r,chosen=false){
+  const intro=chosen?'Deze wil ik vanavond eten 😋':'Zullen we dit vanavond eten?';
+  const diet=r.vegetarian?'vegetarisch':r.seafood?'vis':'vlees/kip';
+  const ingredients=(r.ingredients||[]).slice(0,12).join(', ');
+  return `${intro}
+
+${r.name}
+Type: ${diet}
+Ingrediënten: ${ingredients}${(r.ingredients||[]).length>12?'…':''}
+
+Foto: ${r.photo}`;
+}
+async function shareRecipe(id,chosen=false){
+  const r=getRecipeById(id); if(!r)return;
+  const text=recipeShareText(r,chosen);
+  if(navigator.share){
+    try{await navigator.share({title:r.name,text});toast('Recept gedeeld');return}catch(e){if(e&&e.name==='AbortError')return}
+  }
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`,'_blank','noopener');
+}
+function chooseAndShare(id){
+  chooseDinnerRecipe(id);
+  setTimeout(()=>shareRecipe(id,true),80);
+}
+function modeLabel(){return state.dinnerMode==='together'?'Samen eten':'Alleen eten'}
+function setDinnerMode(mode){state.dinnerMode=mode;store.set('dinnerMode',mode);delete state.choices[key('dinnerRecipe')];render();}
+function recipeScore(r,d){
+  let score=0;
+  if(state.dinnerMode==='together'){
+    if(r.vegetarian)score+=100;
+    else if(r.seafood)score+=35;
+    else score-=30;
+  }else{
+    if(r.meat)score+=65;
+    if(/chicken|turkey/i.test(r.name+' '+r.ingredients.join(' ')))score+=35;
+    if(r.vegetarian)score+=5;
+  }
+  if(/pasta|rice|noodle|potato|couscous|risotto/i.test(r.name+' '+r.ingredients.join(' ')))score+=30;
+  if(/lange|tempo|interval|wedstrijd/i.test(d.training))score+=/pasta|rice|noodle|potato/i.test(r.name+' '+r.ingredients.join(' '))?35:0;
+  score+=(parseInt(r.id||'0',10)+new Date(d.date+'T12:00:00').getDate())%23;
+  return score;
+}
+function suggestedRecipes(d,count=3){
+  if(!state.recipeDb.length)return d.dinners.map(c=>DATA.recipes.find(r=>r.code===c)).filter(Boolean).map(r=>({id:r.code,name:r.name,photo:r.photo,category:r.type,ingredients:r.ingredients.split(';').map(x=>x.trim()),steps:[r.prep],vegetarian:/veget/i.test(r.type),seafood:/vis/i.test(r.type),meat:!/veget|vis/i.test(r.type)}));
+  return [...state.recipeDb].sort((a,b)=>recipeScore(b,d)-recipeScore(a,d)).slice(0,count);
+}
+function detailedRecipeCard(r,compact=false){if(!r)return'';return `<article class="recipe-card database-card"><img class="recipe-hero" src="${r.photo}" alt="${esc(r.name)}" loading="lazy"><div class="recipe-body"><h3>${esc(r.name)}</h3><div class="tags"><span class="tag">${esc(r.category||'Recept')}</span><span class="tag">${r.vegetarian?'Vegetarisch':r.seafood?'Vis':'Vlees'}</span><span class="tag">${state.dinnerMode==='together'?'Voor 2 personen':'Voor 1 persoon'}</span></div>${compact?'':`<h4>Ingrediënten</h4><ul class="ingredient-list">${r.ingredients.map(x=>`<li>${esc(x)}</li>`).join('')}</ul><h4>Bereiding stap voor stap</h4><ol class="step-list">${r.steps.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>`}<div class="recipe-actions"><button class="primary" onclick="addDbRecipe('${r.id}')">Voeg ingrediënten toe</button>${compact?`<button class="secondary" onclick="openRecipeDetail('${r.id}')">Bekijk volledig recept</button><button class="secondary whatsapp" onclick="shareRecipe('${r.id}')">Deel via WhatsApp</button>`:`<button class="secondary whatsapp" onclick="shareRecipe('${r.id}')">Deel via WhatsApp</button><button class="secondary choice-share" onclick="chooseAndShare('${r.id}')">Deze wil ik vanavond</button>`}</div></div></article>`}
+function dinnerSection(d){
+  const suggestions=suggestedRecipes(d,3),chosen=state.choices[key('dinnerRecipe')];
+  return `<section><div class="section-head"><div><h2>Avondeten</h2><p>${state.dinnerMode==='together'?'Voornamelijk vegetarische opties, voor samen koken':'Meer kip- en vleesopties, voor als je alleen eet'} · tik nogmaals om te deselecteren</p></div></div><div class="mode-toggle"><button class="${state.dinnerMode==='alone'?'active':''}" onclick="setDinnerMode('alone')">Alleen eten</button><button class="${state.dinnerMode==='together'?'active':''}" onclick="setDinnerMode('together')">Samen eten</button></div><div class="meal-card dinner-choices">${suggestions.map((r,i)=>`<div class="meal-option ${chosen===r.id?'selected':''}" onclick="chooseDinnerRecipe('${r.id}')"><img src="${r.photo}" alt="${esc(r.name)}" loading="lazy"><div><h4>${esc(r.name)}</h4><p>${esc(r.category)} · ${r.vegetarian?'Vegetarisch':r.seafood?'Vis':'Vlees'}</p></div><span class="check">${chosen===r.id?'✓':''}</span></div>`).join('')}</div><div class="section-head"><div><h2>Receptdetails</h2><p>Volledige ingrediënten en bereidingsstappen</p></div></div>${suggestions.map(r=>detailedRecipeCard(r)).join('')}</section>`;
+}
+function chooseDinnerRecipe(id){const k=key('dinnerRecipe');if(state.choices[k]===id){delete state.choices[k];store.set('choices',state.choices);render();toast('Avondmaaltijd gedeselecteerd');return}state.choices[k]=id;store.set('choices',state.choices);render();toast('Avondmaaltijd gekozen')}
+function addDbRecipe(id){
+  const r=state.recipeDb.find(x=>x.id===id)||suggestedRecipes(day(),20).find(x=>x.id===id);if(!r)return;
+  r.ingredients.forEach(name=>{if(!state.shopping.some(x=>x.name===name))state.shopping.push({name,done:false,img:r.photo})});
+  store.set('shopping',state.shopping);toast('Ingrediënten toegevoegd');
+}
+function openRecipeDetail(id){state.openRecipe=id;render();setTimeout(()=>document.querySelector('.recipe-detail-focus')?.scrollIntoView({behavior:'smooth'}),20)}
+function recipeLibrary(){
+  if(!state.recipeDb.length)return `<div class="recipe-loading"><h2>Receptendatabase</h2><p id="recipeStatus">De database met minimaal 300 recepten wordt geladen. Elk recept bevat een gerechtfoto, ingrediënten en een stap-voor-stapbereiding.</p><button class="primary" onclick="loadRecipeDatabase(true)">Opnieuw laden</button></div>`;
+  let q=state.recipeQuery.toLowerCase().trim();
+  let items=state.recipeDb.filter(r=>(!q||`${r.name} ${r.category} ${r.area} ${r.ingredients.join(' ')}`.toLowerCase().includes(q))&&(state.recipeDiet==='all'||state.recipeDiet==='vegetarian'&&r.vegetarian||state.recipeDiet==='seafood'&&r.seafood||state.recipeDiet==='meat'&&r.meat));
+  const pageSize=24,start=state.recipePage*pageSize,visible=items.slice(start,start+pageSize),open=state.openRecipe?state.recipeDb.find(r=>r.id===state.openRecipe):null;
+  return `<div class="recipe-toolbar"><input value="${esc(state.recipeQuery)}" oninput="setRecipeQuery(this.value)" placeholder="Zoek op gerecht of ingrediënt"><select onchange="setRecipeDiet(this.value)"><option value="all" ${state.recipeDiet==='all'?'selected':''}>Alle recepten</option><option value="vegetarian" ${state.recipeDiet==='vegetarian'?'selected':''}>Vegetarisch</option><option value="seafood" ${state.recipeDiet==='seafood'?'selected':''}>Vis</option><option value="meat" ${state.recipeDiet==='meat'?'selected':''}>Kip en vlees</option></select></div><div class="database-summary"><b>${state.recipeDb.length}</b> volledig Nederlandstalige recepten beschikbaar · <b>${items.length}</b> resultaten</div>${open?`<div class="recipe-detail-focus">${detailedRecipeCard(open)}</div>`:''}<div class="recipe-grid">${visible.map(r=>detailedRecipeCard(r,true)).join('')}</div><div class="pagination"><button ${state.recipePage===0?'disabled':''} onclick="recipePage(-1)">Vorige</button><span>Pagina ${state.recipePage+1} van ${Math.max(1,Math.ceil(items.length/pageSize))}</span><button ${start+pageSize>=items.length?'disabled':''} onclick="recipePage(1)">Volgende</button></div>`;
+}
+function setRecipeQuery(v){state.recipeQuery=v;state.recipePage=0;render()}
+function setRecipeDiet(v){state.recipeDiet=v;state.recipePage=0;render()}
+function recipePage(n){state.recipePage=Math.max(0,state.recipePage+n);render()}
+
+const oldDiary=diary;
+diary=function(){
+  let d=day(),m=selectedMacros(d),b=optionsFor(d.daytype,'ontbijt'),l=optionsFor(d.daytype,'lunch'),s=optionsFor(d.daytype,'snack')||optionsFor(d.daytype,'tussendoor');
+  return `<div class="hero"><div class="hero-row"><input class="date-control" type="date" value="${d.date}" min="${planner[0].date}" max="${planner.at(-1).date}" onchange="changeDate(this.value)"><span class="training-chip">${esc(d.training)}</span></div><div class="remaining">Je kunt nog <strong>${Math.max(0,m.cal-m.eaten).toLocaleString('nl-NL')}</strong> calorieën eten</div><div class="progress"><i style="width:${m.ratio*100}%"></i></div><div class="progress-label"><span>${m.eaten.toLocaleString('nl-NL')} gegeten</span><span>Doel: ${m.cal.toLocaleString('nl-NL')}</span></div></div><div class="macro-grid">${macro('Koolhydraten',Math.round(m.carbs*m.ratio),m.carbs,'var(--pink)')}${macro('Eiwitten',Math.round(m.protein*m.ratio),m.protein,'var(--blue)')}${macro('Vetten',Math.round(m.fat*m.ratio),m.fat,'var(--orange)')}</div><div class="tip"><b>Focus vandaag:</b> ${esc(d.focus)}<br><b>Training:</b> ${esc(d.fuel)}</div>${mealSection('Ontbijt','breakfast',b)}${mealSection('Lunch','lunch',l)}${mealSection('Snack','snack',s)}${dinnerSection(d)}`;
+}
+const oldAiAnswer=aiAnswer;
+aiAnswer=function(q){
+  const t=q.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const d=planDay(resolveQuestionDate(q))||day();
+  const pool=suggestedRecipes(d,30);
+  const wantsVeg=/vegetar|zonder vlees|samen/.test(t),wantsMeat=/kip|vlees|alleen eten/.test(t),wantsRecipe=/recept|ingredient|bereid|maken|koken/.test(t);
+  if(wantsRecipe||wantsVeg||wantsMeat){
+    let choices=pool.filter(r=>wantsVeg?r.vegetarian:wantsMeat?r.meat:true);
+    if(!choices.length)choices=pool;
+    const named=state.recipeDb.find(r=>t.includes(r.name.toLowerCase()));
+    const r=named||choices[0];
+    if(r)return `${r.name} past goed bij ${fmt(d.date)}. ${r.vegetarian?'Dit is vegetarisch en daardoor geschikt om samen te eten.':r.seafood?'Dit is een visgerecht.':'Dit is vooral geschikt wanneer je alleen eet.'} Ingrediënten: ${r.ingredients.join(', ')}. Bereiding: ${r.steps.map((s,i)=>`${i+1}. ${s}`).join(' ')}`;
+  }
+  return oldAiAnswer(q);
+}
+coach=function(){return `<div class="quick-prompts"><button onclick="ask('Wat moet ik morgen eten?')">Morgen eten</button><button onclick="ask('Geef een vegetarisch recept om samen te eten')">Samen vegetarisch</button><button onclick="ask('Geef een kiprecept als ik alleen eet')">Alleen met kip</button><button onclick="ask('Wat eet ik rond een zware trainingsdag?')">Sportvoeding</button></div><div class="chat-card"><div class="messages" id="messages">${state.chat.map(m=>`<div class="bubble ${m.role}">${esc(m.text)}</div>`).join('')}</div></div><form class="chat-input" onsubmit="sendChat(event)"><input id="chatText" placeholder="Vraag naar een dag, recept of ingrediënt…"><button>↑</button></form>`}
+render=function(){
+  let titles={home:'Home',diary:'Voeding',weeks:'Planning',checkin:'Check-in',longevity:'Longevity',courses:'Mijn leeromgeving',shopping:'Boodschappen',profile:'Profiel'};
+  $('#pageTitle').textContent=titles[state.tab]||'Karada Coaches';
+  $('#view').innerHTML=state.tab==='home'?dashboard():state.tab==='diary'?nutritionHub():state.tab==='weeks'?weeks():state.tab==='checkin'?checkIn():state.tab==='longevity'?longevity():state.tab==='courses'?courses():state.tab==='shopping'?shopping():profile();
+  syncNav();window.scrollTo({top:0,behavior:'instant'});
+}
+// Rebind because the recipes tab was added to the navigation.
+bindNav();
+loadRecipeDatabase(false);
+render();
+setTimeout(()=>{document.getElementById('splash')?.classList.add('splash-out');document.getElementById('app')?.classList.remove('is-loading');setTimeout(()=>document.getElementById('splash')?.remove(),450)},2000);
