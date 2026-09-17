@@ -6,7 +6,7 @@
   let restTimerHandle = null;
 
   state.training = {
-    view: 'library',
+    view: 'plan',
     selectedId: null,
     filter: 'Alles',
     exerciseIdx: 0,
@@ -45,7 +45,7 @@
 
   /* Acties */
   window.tOpenWorkout = function (id) { state.training.selectedId = id; state.training.swaps = {}; state.training.view = 'detail'; render(); };
-  window.tBackToLibrary = function () { state.training.view = 'library'; state.training.selectedId = null; state.training.swaps = {}; state.training.swapPickerFor = null; state.training.showInfo = false; state.training.noteOpen = false; render(); };
+  window.tBackToLibrary = function () { state.training.view = 'plan'; state.training.selectedId = null; state.training.swaps = {}; state.training.swapPickerFor = null; state.training.showInfo = false; state.training.noteOpen = false; render(); };
   window.tSetFilter = function (cat) { state.training.filter = cat; render(); };
   window.tStartWorkout = function () {
     const w = tWorkout(); const logs = {};
@@ -247,7 +247,8 @@
   }
 
   window.trainingView = function () {
-    let body = state.training.view === 'library' ? trainingLibrary()
+    let body = state.training.view === 'plan' ? window.trainingPlanHome()
+      : state.training.view === 'library' ? trainingLibrary()
       : state.training.view === 'detail' ? trainingDetail()
       : state.training.view === 'active' ? trainingActive()
       : state.training.view === 'complete' ? trainingComplete() : trainingLibrary();
@@ -256,10 +257,10 @@
 
   /* Hook de training-tab in de bestaande render-dispatcher. */
   render = function () {
-    let titles = { diary: (state.date === localISO() ? 'Vandaag' : fmt(state.date)), weeks: 'Planning', shopping: 'Boodschappen', recipes: 'Recepten', training: 'Trainingen', coach: 'AI voedingscoach', profile: state.profile.name };
+    let titles = { home: 'Home', diary: 'Voeding', weeks: 'Planning', checkin: 'Check-in', longevity: 'Longevity', courses: 'Mijn leeromgeving', shopping: 'Boodschappen', training: 'Mijn plan', profile: 'Profiel' };
     $('#pageTitle').textContent = titles[state.tab] || 'Karada Coaches';
-    $('#view').innerHTML = state.tab === 'diary' ? diary() : state.tab === 'weeks' ? weeks() : state.tab === 'shopping' ? shopping() : state.tab === 'recipes' ? recipeLibrary() : state.tab === 'training' ? window.trainingView() : state.tab === 'coach' ? coach() : profile();
-    document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === state.tab));
+    $('#view').innerHTML = state.tab === 'home' ? dashboard() : state.tab === 'diary' ? nutritionHub() : state.tab === 'weeks' ? weeks() : state.tab === 'checkin' ? checkIn() : state.tab === 'longevity' ? longevity() : state.tab === 'courses' ? courses() : state.tab === 'shopping' ? shopping() : state.tab === 'training' ? window.trainingView() : profile();
+    syncNav();
     window.scrollTo({ top: 0, behavior: 'instant' });
   };
   render();

@@ -1,20 +1,15 @@
 {
-  "name": "Karada Coaches",
+  "name": "Karada Performance",
   "short_name": "Karada",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#050706",
-  "theme_color": "#050706",
+  "background_color": "#5f8985",
+  "theme_color": "#5f8985",
   "lang": "nl-NL",
   "icons": [
     {
-      "src": "icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "icons/icon-512.png",
-      "sizes": "512x512",
+      "src": "Screenshot 2026-04-08 162514.png",
+      "sizes": "any",
       "type": "image/png"
     }
   ]

@@ -1,9 +1,29 @@
 <!doctype html>
-<html lang="nl"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-<meta name="theme-color" content="#0a0c0b"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="icons/icon-192.png">
-<title>Karada Coaches</title><link rel="stylesheet" href="styles.css"></head>
-<body><div id="app"><header class="topbar"><div><div class="eyebrow">KARADA COACHES</div><h1 id="pageTitle">Vandaag</h1></div><button class="icon-btn" id="aiQuick" aria-label="Open AI coach">✦</button></header><main id="view"></main><nav id="nav">
-<button data-tab="diary" class="active"><span>▣</span>Dagboek</button><button data-tab="weeks"><span>▦</span>Planning</button><button data-tab="training"><span>🏋</span>Training</button><button data-tab="shopping"><span>🛒</span>Boodschappen</button><button data-tab="recipes"><span>◫</span>Recepten</button><button data-tab="coach"><span>✦</span>AI coach</button><button data-tab="profile"><span>◎</span>Ik</button></nav></div>
-<div id="toast"></div><script src="data.js"></script><script src="nl-recipes.js"></script><script src="app.js"></script><script src="training-data.js"></script><script src="training.js"></script></body></html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#688f8c">
+  <meta name="description" content="Afgeschermde coachomgeving voor Karada Performance.">
+  <title>Karada Coachportaal</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <aside>
+    <div class="brand"><span>K</span><div><b>KARADA</b><small>COACHPORTAAL</small></div></div>
+    <nav>
+      <button data-view="nutrition" class="active"><span>◉</span>Voeding</button>
+      <button data-view="planning"><span>▦</span>Planning</button>
+      <button data-view="goals"><span>◎</span>Doelen</button>
+      <button data-view="training"><span>◇</span>Trainingsschema's</button>
+    </nav>
+    <div class="private-note"><b>Coachomgeving</b><span>Niet zichtbaar in de klantenapp</span></div>
+  </aside>
+  <div class="shell">
+    <header><div><span class="eyebrow">KARADA PERFORMANCE</span><h1 id="title">Voedingsplan</h1></div><label>Klant<select id="clientSelect"></select></label></header>
+    <main id="view"></main>
+  </div>
+  <div id="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>
