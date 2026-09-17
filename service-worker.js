@@ -1,5 +1,5 @@
-const C='karada-dashboard-v11';
-const AS=['./','index.html','styles.css','app.js','data.js','nl-recipes.js','training-data.js','training.js','manifest.webmanifest','Screenshot 2026-04-08 162514.png'];
+const C='karada-dashboard-v12';
+const AS=['./','index.html','styles.css','app.js','data.js','nl-recipes.js','training-data.js','training.js','supabase-config.js','cloud-client.js','manifest.webmanifest','Screenshot 2026-04-08 162514.png'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(C).then(cache=>cache.addAll(AS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==C).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener('message',event=>{if(event.data==='SKIP_WAITING')self.skipWaiting()});

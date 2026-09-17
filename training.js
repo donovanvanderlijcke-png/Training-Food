@@ -19,6 +19,8 @@
     restActive: false,
     restLeft: 0,
     restTotal: 0,
+    activeCustomWorkout: null,
+    builderRows: store.get('workoutBuilderRows',[{exerciseId:'w1e1',sets:4,reps:6,weight:60}]),
     weeklyDone: store.get('trainingWeeklyDone', 3)
   };
 
@@ -35,7 +37,8 @@
       restSec: alt.restSec != null ? alt.restSec : orig.restSec, unitOverride: alt.unitOverride };
   }
   function tResolveExercise(orig) { const altId = state.training.swaps[orig.id]; if (!altId || !orig.alternatives) return orig; const alt = orig.alternatives.find(a => a.id === altId); return alt ? tBuildFromAlt(orig, alt) : orig; }
-  function tWorkout() { return T.workouts.find(w => w.id === state.training.selectedId) || null; }
+  const tExerciseCatalog=()=>{const seen=new Set();return T.workouts.flatMap(w=>w.exercises).filter(e=>!seen.has(e.name.toLowerCase())&&seen.add(e.name.toLowerCase()))};
+  function tWorkout() { return state.training.activeCustomWorkout?.id===state.training.selectedId?state.training.activeCustomWorkout:T.workouts.find(w => w.id === state.training.selectedId) || null; }
   function tFeatured() { return T.workouts.find(w => w.featured); }
   function tCurrentExercise() { const w = tWorkout(); if (state.training.view !== 'active' || !w) return null; return tResolveExercise(w.exercises[state.training.exerciseIdx]); }
   function tAltBadge(type) { if (!type) return ''; return `<span class="alt-badge ${tAltClass(type)}">${tAltLabel(type)}</span>`; }
@@ -45,6 +48,8 @@
 
   /* Acties */
   window.tOpenWorkout = function (id) { state.training.selectedId = id; state.training.swaps = {}; state.training.view = 'detail'; render(); };
+  window.tOpenLibrary = function(){state.training.view='library';state.training.selectedId=null;render()};
+  window.tOpenBuilder = function(){state.training.view='builder';state.training.selectedId=null;render()};
   window.tBackToLibrary = function () { state.training.view = 'plan'; state.training.selectedId = null; state.training.swaps = {}; state.training.swapPickerFor = null; state.training.showInfo = false; state.training.noteOpen = false; render(); };
   window.tSetFilter = function (cat) { state.training.filter = cat; render(); };
   window.tStartWorkout = function () {
@@ -96,6 +101,12 @@
     }, 1000);
   }
   window.tSkipRest = function () { if (restTimerHandle) { clearInterval(restTimerHandle); restTimerHandle = null; } state.training.restActive = false; render(); };
+  window.trainingVariantsFor=function(name){const target=String(name).toLowerCase(),match=tExerciseCatalog().find(e=>e.name.toLowerCase()===target)||tExerciseCatalog().find(e=>target.includes(e.name.toLowerCase())||e.name.toLowerCase().includes(target));return match?.alternatives||[]};
+  window.tAddBuilderRow=function(){state.training.builderRows.push({exerciseId:tExerciseCatalog()[0]?.id||'',sets:3,reps:10,weight:0});render()};
+  window.tRemoveBuilderRow=function(index){state.training.builderRows.splice(index,1);if(!state.training.builderRows.length)state.training.builderRows.push({exerciseId:tExerciseCatalog()[0]?.id||'',sets:3,reps:10,weight:0});render()};
+  window.tUpdateBuilderRow=function(index,key,value){state.training.builderRows[index][key]=key==='exerciseId'?value:Math.max(0,+value||0);store.set('workoutBuilderRows',state.training.builderRows)};
+  window.tSaveBuilder=function(){const catalog=tExerciseCatalog(),exercises=state.training.builderRows.map((row,i)=>{const source=catalog.find(x=>x.id===row.exerciseId)||catalog[0];return {...source,id:`custom-${Date.now()}-${i}`,setsCount:Math.max(1,row.sets||3),targetReps:Math.max(1,row.reps||10),targetWeight:Math.max(0,row.weight||0),alternatives:source.alternatives||[]}});if(!exercises.length)return;state.training.activeCustomWorkout={id:'my-workout',title:'Mijn eigen training',category:'Kracht',duration:Math.max(20,exercises.length*8),phase:'Zelf samengesteld',coachNote:'Pas tijdens de training een progressie of regressie toe wanneer dat beter past.',exercises};state.training.selectedId='my-workout';state.training.swaps={};state.training.view='detail';store.set('workoutBuilderRows',state.training.builderRows);render()};
+  window.tStartCoachSession=function(index){const plan=assignedTrainingPlan(),session=plan?.sessions?.[index];if(!session)return;const catalog=tExerciseCatalog(),exercises=session.exercises.map((item,i)=>{const source=catalog.find(x=>x.name.toLowerCase()===String(item.name).toLowerCase())||catalog.find(x=>String(item.name).toLowerCase().includes(x.name.toLowerCase())||x.name.toLowerCase().includes(String(item.name).toLowerCase()));return source?{...source,id:`coach-${index}-${i}`,setsCount:Math.max(1,+item.sets||3),targetReps:Math.max(1,parseInt(item.reps)||10),alternatives:source.alternatives||[]}:{id:`coach-${index}-${i}`,name:item.name,setsCount:Math.max(1,+item.sets||3),targetReps:Math.max(1,parseInt(item.reps)||10),targetWeight:0,restSec:90,level:'Gemiddeld',alternatives:[]}});state.training.activeCustomWorkout={id:'coach-session',title:session.title,category:'Kracht',duration:Math.max(20,exercises.length*8),phase:`${session.day} · van je coach`,coachNote:plan.description,exercises};state.training.selectedId='coach-session';state.training.view='detail';state.training.swaps={};state.planSessionIdx=null;render()};
 
   /* Render */
   function trainingLibrary() {
@@ -126,6 +137,8 @@
         </div>`).join('') || `<div class="empty">Geen trainingen in deze categorie.</div>`}
       </div>`;
   }
+
+  function trainingBuilder(){const catalog=tExerciseCatalog();return `<button class="t-back" onclick="tBackToLibrary()">‹ Mijn plan</button><section class="builder-hero"><span class="t-eyebrow">Workout builder</span><h2>Maak je eigen training</h2><p>Kies oefeningen, sets, herhalingen en gewicht. Tijdens de workout kun je per oefening een progressie of regressie kiezen.</p></section><div class="workout-builder-list">${state.training.builderRows.map((row,i)=>{const current=catalog.find(x=>x.id===row.exerciseId)||catalog[0],variants=current?.alternatives||[];return `<article><div class="builder-row-head"><b>Oefening ${i+1}</b><button onclick="tRemoveBuilderRow(${i})">×</button></div><select onchange="tUpdateBuilderRow(${i},'exerciseId',this.value)">${catalog.map(e=>`<option value="${e.id}" ${e.id===row.exerciseId?'selected':''}>${esc(e.name)}</option>`).join('')}</select><div class="builder-numbers"><label>Sets<input type="number" min="1" value="${row.sets}" oninput="tUpdateBuilderRow(${i},'sets',this.value)"></label><label>Reps<input type="number" min="1" value="${row.reps}" oninput="tUpdateBuilderRow(${i},'reps',this.value)"></label><label>Gewicht<input type="number" min="0" step="0.5" value="${row.weight}" oninput="tUpdateBuilderRow(${i},'weight',this.value)"></label></div>${variants.length?`<div class="builder-variants">${variants.map(v=>`<span class="${tAltClass(v.type)}"><b>${tAltLabel(v.type)}</b>${esc(v.name)}</span>`).join('')}</div>`:'<small>Voor deze oefening zijn nog geen variaties toegevoegd.</small>'}</article>`}).join('')}</div><button class="secondary builder-add-row" onclick="tAddBuilderRow()">＋ Oefening toevoegen</button><button class="primary" onclick="tSaveBuilder()">Training bekijken en starten</button>`}
 
   function trainingDetail() {
     const w = tWorkout();
@@ -249,6 +262,7 @@
   window.trainingView = function () {
     let body = state.training.view === 'plan' ? window.trainingPlanHome()
       : state.training.view === 'library' ? trainingLibrary()
+      : state.training.view === 'builder' ? trainingBuilder()
       : state.training.view === 'detail' ? trainingDetail()
       : state.training.view === 'active' ? trainingActive()
       : state.training.view === 'complete' ? trainingComplete() : trainingLibrary();
@@ -261,7 +275,7 @@
     $('#pageTitle').textContent = titles[state.tab] || 'Karada Coaches';
     $('#view').innerHTML = state.tab === 'home' ? dashboard() : state.tab === 'diary' ? nutritionHub() : state.tab === 'weeks' ? weeks() : state.tab === 'checkin' ? checkIn() : state.tab === 'longevity' ? longevity() : state.tab === 'courses' ? courses() : state.tab === 'shopping' ? shopping() : state.tab === 'training' ? window.trainingView() : profile();
     syncNav();
-    window.scrollTo({ top: 0, behavior: 'instant' });
+    finishRenderScroll();
   };
   render();
 })();

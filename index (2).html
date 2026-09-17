@@ -2,58 +2,29 @@
 <html lang="nl">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-  <meta name="theme-color" content="#5f8985">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="description" content="Jouw persoonlijke Karada dashboard voor training, voeding en voortgang.">
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" type="image/png" href="Screenshot%202026-04-08%20162514.png">
-  <link rel="apple-touch-icon" href="Screenshot%202026-04-08%20162514.png">
-  <title>Karada Performance</title>
-  <link rel="stylesheet" href="styles.css">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#688f8c">
+  <meta name="description" content="Afgeschermde coachomgeving voor Karada Performance.">
+  <title>Karada Coachportaal</title>
+  <link rel="stylesheet" href="styles.css?v=12">
 </head>
 <body>
-  <div id="splash" class="splash" role="status" aria-label="Karada wordt geopend">
-    <img src="Screenshot%202026-04-08%20162514.png" alt="Karada">
-  </div>
-
-  <div id="app" class="app-shell is-loading">
-    <header class="topbar">
-      <div><div class="eyebrow">KARADA PERFORMANCE</div><h1 id="pageTitle">Home</h1></div>
-    </header>
-    <main id="view"></main>
-    <nav id="nav" aria-label="Hoofdnavigatie">
-      <div class="desktop-brand"><img src="Screenshot%202026-04-08%20162514.png" alt=""><span>Karada</span></div>
-      <button data-tab="home"><span>⌂</span>Home</button>
-      <button data-tab="training"><span>◇</span>Training</button>
-      <button data-tab="diary"><span>◉</span>Voeding</button>
-      <button data-tab="weeks" class="desktop-only"><span>▦</span>Planning</button>
-      <button data-tab="checkin" class="desktop-only"><span>⌁</span>Check-in</button>
-      <button data-tab="longevity" class="desktop-only"><span>♡</span>Longevity</button>
-      <button data-tab="courses" class="desktop-only"><span>◫</span>Leeromgeving</button>
-      <button data-tab="shopping" class="desktop-only"><span>⌑</span>Boodschappen</button>
-      <button data-tab="profile" class="desktop-only"><span>◎</span>Profiel</button>
-      <button data-tab="more" class="mobile-more"><span>•••</span>Meer</button>
+  <aside>
+    <div class="brand"><span>K</span><div><b>KARADA</b><small>COACHPORTAAL</small></div></div>
+    <nav>
+      <button data-view="clients" class="active"><span>♙</span>Klanten</button>
+      <button data-view="nutrition"><span>◉</span>Voeding</button>
+      <button data-view="planning"><span>▦</span>Planning</button>
+      <button data-view="goals"><span>◎</span>Doelen</button>
+      <button data-view="training"><span>◇</span>Trainingsschema's</button>
     </nav>
+    <div class="private-note"><b>Coachomgeving</b><span>Niet zichtbaar in de klantenapp</span></div>
+  </aside>
+  <div class="shell">
+    <header><div><span class="eyebrow">KARADA PERFORMANCE</span><h1 id="title">Klanten</h1></div><label>Klant<select id="clientSelect"></select></label></header>
+    <main id="view"></main>
   </div>
-
-  <div id="moreOverlay" class="more-overlay" aria-hidden="true" onclick="closeMoreMenu(event)">
-    <section class="more-sheet" role="dialog" aria-modal="true" aria-labelledby="moreTitle" onclick="event.stopPropagation()">
-      <div class="sheet-handle"></div>
-      <div class="more-head"><h2 id="moreTitle">Meer</h2><button onclick="closeMoreMenu()" aria-label="Sluiten">×</button></div>
-      <div class="more-grid">
-        <button onclick="goToTab('weeks')"><span>▦</span>Planning</button>
-        <button onclick="goToTab('checkin')"><span>⌁</span>Check-in</button>
-        <button onclick="goToTab('longevity')"><span>♡</span>Longevity</button>
-        <button onclick="goToTab('courses')"><span>◫</span>Leeromgeving</button>
-        <button onclick="goToTab('shopping')"><span>⌑</span>Boodschappen</button>
-        <button onclick="goToTab('profile')"><span>◎</span>Profiel</button>
-      </div>
-    </section>
-  </div>
-
   <div id="toast"></div>
-  <script src="data.js"></script><script src="nl-recipes.js"></script><script src="app.js"></script><script src="training-data.js"></script><script src="training.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js?v=12"></script><script src="app.js?v=12"></script><script src="cloud-coach.js?v=12"></script>
 </body>
 </html>
