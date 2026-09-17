@@ -41,3 +41,5 @@ node tests/smoke.mjs
 ```
 
 De controle test onder meer de zes eetmomenten, de voorbeeldzin voor voeding, rapportdatums, de gescheiden coachroute en de aanwezigheid van de cloudkoppeling.
+
+De voedingsinvoer ondersteunt ook aantallen, porties en merknamen, bijvoorbeeld `3 eieren`, `2 sneetjes volkorenbrood`, `1 scoop whey` en `30 g MyProtein Impact Whey`. Een gevonden product wordt altijd eerst ter controle getoond voordat de macro’s worden toegevoegd.

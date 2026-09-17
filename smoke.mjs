@@ -16,9 +16,11 @@ function functionSource(source,name){
   throw new Error(`${name} kon niet worden gelezen`);
 }
 
-const context={};vm.createContext(context);vm.runInContext(functionSource(app,'mealIngredientsFromText'),context);vm.runInContext(functionSource(app,'reportDateFromText'),context);
+const context={};vm.createContext(context);vm.runInContext(`const NUMBER_WORDS={een:1,één:1,twee:2,drie:3,vier:4,vijf:5,zes:6,zeven:7,acht:8,negen:9,tien:10,halve:.5,half:.5};function normalizeFoodTerm(value){return value.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/\\b(gekookt|bereid|rauw|ongezoet|gram|gr)\\b/g,' ').replace(/\\s+/g,' ').trim()}${functionSource(app,'amountNumber')}${functionSource(app,'mealIngredientsFromText')}`,context);vm.runInContext(functionSource(app,'reportDateFromText'),context);
 const ingredients=JSON.parse(JSON.stringify(context.mealIngredientsFromText('ik heb voor ontbijt 30 gram havermout 30 gram whey proteine en 5g 85% donkere chocola gegeten')));
-assert.deepEqual(ingredients.map(x=>[x.grams,x.term]),[[30,'havermout'],[30,'whey proteine'],[5,'85% donkere chocola']]);
+assert.deepEqual(ingredients.map(x=>[x.amount,x.term]),[[30,'havermout'],[30,'whey proteine'],[5,'85% donkere chocola']]);
+const varied=JSON.parse(JSON.stringify(context.mealIngredientsFromText('3 eieren, 2 sneetjes volkorenbrood en 30 g MyProtein Impact Whey Vanille')));
+assert.deepEqual(varied.map(x=>[x.amount,x.unit,x.term]),[[3,'stuk','eieren'],[2,'sneetjes','volkorenbrood'],[30,'g','myprotein impact whey vanille']]);
 assert.equal(context.reportDateFromText('Afname: 13-05-2026'),'2026-05-13');
 assert.equal(context.reportDateFromText('Rapport zonder datum'),'');
 
