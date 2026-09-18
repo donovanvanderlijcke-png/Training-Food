@@ -1,2 +1,30 @@
 <!doctype html>
-<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="0;url=app/"><title>Karada Performance</title></head><body><p><a href="app/">Open Karada Performance</a></p></body></html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#688f8c">
+  <meta name="description" content="Afgeschermde coachomgeving voor Karada Performance.">
+  <title>Karada Coachportaal</title>
+  <link rel="stylesheet" href="styles.css?v=12">
+</head>
+<body>
+  <aside>
+    <div class="brand"><span>K</span><div><b>KARADA</b><small>COACHPORTAAL</small></div></div>
+    <nav>
+      <button data-view="clients" class="active"><span>♙</span>Klanten</button>
+      <button data-view="nutrition"><span>◉</span>Voeding</button>
+      <button data-view="planning"><span>▦</span>Planning</button>
+      <button data-view="goals"><span>◎</span>Doelen</button>
+      <button data-view="training"><span>◇</span>Trainingsschema's</button>
+    </nav>
+    <div class="private-note"><b>Coachomgeving</b><span>Niet zichtbaar in de klantenapp</span></div>
+  </aside>
+  <div class="shell">
+    <header><div><span class="eyebrow">KARADA PERFORMANCE</span><h1 id="title">Klanten</h1></div><label>Klant<select id="clientSelect"></select></label></header>
+    <main id="view"></main>
+  </div>
+  <div id="toast"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js?v=12"></script><script src="app.js?v=12"></script><script src="cloud-coach.js?v=12"></script>
+</body>
+</html>

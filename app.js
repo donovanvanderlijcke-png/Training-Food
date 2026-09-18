@@ -25,7 +25,9 @@ const FOOD_DB=[
   {id:'rundergehakt',name:'Mager rundergehakt, bereid',kcal:215,carbs:0,protein:26,fat:12},
   {id:'tofu',name:'Tofu',kcal:144,carbs:2.8,protein:17,fat:8.7},
   {id:'broccoli',name:'Broccoli, gekookt',kcal:35,carbs:2,protein:3.6,fat:.4},
-  {id:'appel',name:'Appel',kcal:52,carbs:14,protein:.3,fat:.2}
+  {id:'appel',name:'Appel',kcal:52,carbs:14,protein:.3,fat:.2},
+  {id:'noten',name:'Ongezouten gemengde noten',kcal:607,carbs:21,protein:20,fat:54},
+  {id:'witte-bol',name:'Witte bol',kcal:270,carbs:52,protein:9,fat:3}
 ];
 const LAB_RESULTS=[
   {group:'Bloedbeeld',name:'Leucocyten',value:'6.2',unit:'/nl',reference:'4.2 – 9.1',status:'ok'},
@@ -99,6 +101,7 @@ const DEFAULT_TRAINING_PLAN={id:'performance-basis',title:'Performance Basis',de
 ]};
 state.trainingPlans=store.get('trainingPlans',[DEFAULT_TRAINING_PLAN]);
 state.clientPlanAssignments=store.get('clientPlanAssignments',{});
+state.selfTrainingPlan=store.get('selfTrainingPlan',null);
 if(!store.get('samplePlanMigrationDone',false)){for(const id of Object.keys(state.clientPlanAssignments))if(state.clientPlanAssignments[id]==='performance-basis')delete state.clientPlanAssignments[id];store.set('clientPlanAssignments',state.clientPlanAssignments);store.set('samplePlanMigrationDone',true)}
 state.editingPlanId=state.trainingPlans[0]?.id||null;
 state.coachPortalTab=store.get('coachPortalTab','schedule');
@@ -351,15 +354,15 @@ function longevity(){
   <section class="lab-list">${labRows()}</section>
   <section class="medical-note"><b>Belangrijk</b><p>Dit dashboard ondersteunt vergelijking en signalering, maar stelt geen diagnose. “Binnen bereik” betekent niet automatisch gezond en “buiten bereik” is niet automatisch ziekte. Laat interpretatie en vervolgonderzoek over aan een bevoegde arts.</p></section>`;
 }
-function assignedTrainingPlan(clientId=state.activeClientId){const id=state.clientPlanAssignments[clientId];return state.trainingPlans.find(p=>p.id===id)||null}
+function assignedTrainingPlan(clientId=state.activeClientId){const id=state.clientPlanAssignments[clientId],coachPlan=state.trainingPlans.find(p=>p.id===id);return coachPlan||state.selfTrainingPlan||null}
 function methodLabel(method){return method==='cluster'?'Cluster 6 × 6 · 10 sec rust':method==='superset-a'?'Superset A':method==='superset-b'?'Superset B':'Normale sets'}
 window.openPlanSession=function(idx){state.planSessionIdx=idx;render()}
 window.closePlanSession=function(){state.planSessionIdx=null;render()}
 window.trainingPlanHome=function(){
-  const client=CLIENTS.find(c=>c.id===state.activeClientId)||CLIENTS[0],plan=assignedTrainingPlan();
-  if(!plan)return `<div class="plan-empty"><span>◇</span><h2>Nog geen trainingsplan</h2><p>Je coach heeft nog geen persoonlijk schema aan jouw account gekoppeld. Je kunt wel zelf een complete training samenstellen en uitvoeren.</p><button class="primary" onclick="tOpenBuilder()">Maak mijn training</button><button class="secondary" onclick="tOpenLibrary()">Bekijk trainingsbibliotheek</button></div>`;
-  if(state.planSessionIdx!=null){const s=plan.sessions[state.planSessionIdx];if(!s){state.planSessionIdx=null;return window.trainingPlanHome()}return `<button class="t-back" onclick="closePlanSession()">‹ Mijn plan</button><section class="plan-session-hero"><span>${esc(s.day)}</span><h2>${esc(s.title)}</h2><p>${s.exercises.length} oefeningen · persoonlijk ingesteld door je coach</p></section><div class="plan-exercises">${s.exercises.map((e,i)=>{const variants=window.trainingVariantsFor?.(e.name)||[];return `<article class="plan-exercise ${e.method}"><div class="exercise-number">${i+1}</div><div><span class="method-badge">${methodLabel(e.method)}</span><h3>${esc(e.name)}</h3><p>${e.sets} sets × ${esc(e.reps)} reps</p>${variants.length?`<div class="plan-variants">${variants.map(v=>`<span class="${v.type}"><b>${v.type==='progressie'?'Progressie':v.type==='regressie'?'Regressie':'Variant'}</b>${esc(v.name)}</span>`).join('')}</div>`:''}</div></article>`}).join('')}</div><button class="primary" onclick="tStartCoachSession(${state.planSessionIdx})">Start deze training</button>`}
-  return `<div class="my-plan-head"><div><span class="card-label">Mijn plan</span><h2>${esc(plan.title)}</h2><p>${esc(plan.description)}</p></div><span class="coach-plan-pill">Van je coach</span></div><section class="plan-week-summary"><div><b>${plan.sessions.length}</b><span>trainingen per week</span></div><div><b>${plan.sessions.reduce((n,s)=>n+s.exercises.length,0)}</b><span>oefeningen</span></div><div><b>${plan.sessions.some(s=>s.exercises.some(e=>e.method==='cluster'))?'Ja':'Nee'}</b><span>clustersets</span></div></section><div class="section-head"><div><h2>Jouw trainingsweek</h2><p>Persoonlijk plan voor ${esc(client.name)}</p></div></div><div class="plan-session-list">${plan.sessions.map((s,i)=>`<button onclick="openPlanSession(${i})"><div class="plan-day"><span>${esc(s.day.slice(0,2))}</span></div><div><b>${esc(s.title)}</b><small>${s.exercises.length} oefeningen · ${s.exercises.some(e=>e.method==='cluster')?'inclusief clusterset':s.exercises.some(e=>String(e.method).startsWith('superset'))?'inclusief superset':'normale sets'}</small></div><span>›</span></button>`).join('')}</div>`;
+  const client=CLIENTS.find(c=>c.id===state.activeClientId)||CLIENTS[0],plan=assignedTrainingPlan(),selfMade=plan?.source==='self';
+  if(!plan)return `<div class="plan-empty"><span>◇</span><h2>Nog geen trainingsplan</h2><p>Je coach heeft nog geen persoonlijk schema aan jouw account gekoppeld. Beschrijf daarom zelf je gewenste trainingsweek en laat de app een compleet, bewerkbaar schema maken.</p><button class="primary" onclick="tOpenBuilder()">Maak mijn weekschema</button><button class="secondary" onclick="tOpenLibrary()">Bekijk trainingsbibliotheek</button></div>`;
+  if(state.planSessionIdx!=null){const s=plan.sessions[state.planSessionIdx];if(!s){state.planSessionIdx=null;return window.trainingPlanHome()}return `<button class="t-back" onclick="closePlanSession()">‹ Mijn plan</button><section class="plan-session-hero"><span>${esc(s.day)}</span><h2>${esc(s.title)}</h2><p>${s.exercises.length} oefeningen · ${selfMade?'zelf samengesteld':'persoonlijk ingesteld door je coach'}</p></section><div class="plan-exercises">${s.exercises.map((e,i)=>{const variants=e.alternatives||window.trainingVariantsFor?.(e.name)||[];return `<article class="plan-exercise ${e.method}"><div class="exercise-number">${i+1}</div><div><span class="method-badge">${methodLabel(e.method)}</span><h3>${esc(e.name)}</h3><p>${e.sets} sets × ${esc(e.reps)} reps${e.equipment?` · ${esc(e.equipment)}`:''}</p>${variants.length?`<div class="plan-variants">${variants.map(v=>`<span class="${v.type}"><b>${v.type==='progressie'?'Progressie':v.type==='regressie'?'Regressie':'Variant'}</b>${esc(v.name)}</span>`).join('')}</div>`:''}</div></article>`}).join('')}</div><button class="primary" onclick="tStartCoachSession(${state.planSessionIdx})">Start deze training</button>`}
+  return `<div class="my-plan-head"><div><span class="card-label">Mijn plan</span><h2>${esc(plan.title)}</h2><p>${esc(plan.description)}</p></div><span class="coach-plan-pill">${selfMade?'Zelf samengesteld':'Van je coach'}</span></div><section class="plan-week-summary"><div><b>${plan.sessions.length}</b><span>trainingen per week</span></div><div><b>${plan.sessions.reduce((n,s)=>n+s.exercises.length,0)}</b><span>oefeningen</span></div><div><b>${plan.volumeTarget||'—'}</b><span>sets per spiergroep</span></div></section><div class="section-head"><div><h2>Jouw trainingsweek</h2><p>${selfMade?'Gegenereerd op basis van jouw beschrijving':`Persoonlijk plan voor ${esc(client.name)}`}</p></div>${selfMade?'<button class="secondary" onclick="tOpenBuilder()">Schema aanpassen</button>':''}</div><div class="plan-session-list">${plan.sessions.map((s,i)=>`<button onclick="openPlanSession(${i})"><div class="plan-day"><span>${esc(s.day.slice(0,2))}</span></div><div><b>${esc(s.title)}</b><small>${s.exercises.length} oefeningen · ${s.exercises.some(e=>e.method==='cluster')?'inclusief clusterset':s.exercises.some(e=>String(e.method).startsWith('superset'))?'inclusief superset':'normale sets'}</small></div><span>›</span></button>`).join('')}</div>`;
 }
 function setCoachPortalTab(tab){state.coachPortalTab=tab;store.set('coachPortalTab',tab);render()}
 function selectCoachClient(id){state.coachClientId=id;store.set('coachClientId',id);render()}
@@ -438,7 +441,7 @@ const FOOD_ALIASES={
   kwark:'kwark','magere kwark':'kwark',banaan:'banaan',rijst:'rijst','witte rijst':'rijst',kip:'kip',kipfilet:'kip',zalm:'zalm',ei:'ei',eieren:'ei',
   brood:'brood','volkoren brood':'brood','volkorenbrood':'brood',pindakaas:'pindakaas',aardappel:'aardappel',avocado:'avocado',olijfolie:'olijfolie',
   melk:'melk','halfvolle melk':'melk',yoghurt:'griekse-yoghurt','griekse yoghurt':'griekse-yoghurt',muesli:'muesli',pasta:'volkoren-pasta','volkoren pasta':'volkoren-pasta',
-  gehakt:'rundergehakt','rundergehakt':'rundergehakt',tofu:'tofu',broccoli:'broccoli',appel:'appel'
+  gehakt:'rundergehakt','rundergehakt':'rundergehakt',tofu:'tofu',broccoli:'broccoli',appel:'appel',noten:'noten','gemengde noten':'noten','ongezouten noten':'noten','witte bol':'witte-bol','witte bollen':'witte-bol'
 };
 const NUMBER_WORDS={een:1,één:1,twee:2,drie:3,vier:4,vijf:5,zes:6,zeven:7,acht:8,negen:9,tien:10,halve:.5,half:.5};
 const PORTION_RULES=[
@@ -451,15 +454,17 @@ const PORTION_RULES=[
   {test:/\bolijfolie|olie/,unit:/eetlepel|el/,grams:10,label:'eetlepel'},
   {test:/\bolijfolie|olie/,unit:/theelepel|tl/,grams:5,label:'theelepel'},
   {test:/\bmelk|drank/,unit:/glas/,grams:250,label:'glas'},
-  {test:/\bkwark|yoghurt|skyr|optimel/,unit:/bakje|portie/,grams:200,label:'bakje'}
+  {test:/\bkwark|yoghurt|skyr|optimel/,unit:/bakje|portie/,grams:200,label:'bakje'},
+  {test:/\bnoot|noten\b/,unit:/handpalm/,grams:25,label:'handpalm noten'},
+  {test:/\bwitte bol(len)?\b/,grams:50,label:'witte bol'}
 ];
 function normalizeFoodTerm(value){return value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\b(gekookt|bereid|rauw|ongezoet|gram|gr)\b/g,' ').replace(/\s+/g,' ').trim()}
 function amountNumber(value){return NUMBER_WORDS[normalizeFoodTerm(value)]??+String(value).replace(',','.')}
 function mealIngredientsFromText(text){
-  const cleaned=String(text).toLowerCase().replace(/\bik heb\b/g,' ').replace(/\bvoor\s+(ontbijt|lunch|avondeten|diner|snack(?:\s*[123])?)\b/g,' ').replace(/\bgegeten\b[.!?]*$/g,' ').replace(/[;+]/g,',').replace(/\s+/g,' ').trim(),items=[];
-  const number='(?:\\d+(?:[.,]\\d+)?|een|één|twee|drie|vier|vijf|zes|zeven|acht|negen|tien|halve|half)',unit='(?:kg|g|gr|gram|ml|cl|l|stuks?|sneetjes?|boterhammen?|scoops?|scheppen?|eetlepels?|theelepels?|el|tl|glazen?|bakjes?|porties?)';
+  const cleaned=String(text).toLowerCase().replace(/\bik heb\b/g,' ').replace(/\bvoor\s+(ontbijt|lunch|avondeten|diner|snack(?:\s*[123])?)\b/g,' ').replace(/\bgegeten\b/g,' ').replace(/[;+]/g,',').replace(/\s+/g,' ').trim(),items=[];
+  const number='(?:\\d+(?:[.,]\\d+)?|een|één|twee|drie|vier|vijf|zes|zeven|acht|negen|tien|halve|half)',unit='(?:kg|g|gr|gram|ml|cl|l|stuks?|sneetjes?|boterhammen?|scoops?|scheppen?|eetlepels?|theelepels?|el|tl|glazen?|bakjes?|porties?|handpalmen?)';
   const rx=new RegExp(`(${number})\\s*(${unit})?\\s+(.+?)(?=(?:,?\\s+(?:en\\s+)?${number}\\s*(?:${unit})?\\s+)|$)`,'gi');let match;
-  while((match=rx.exec(cleaned))){const amount=amountNumber(match[1]),rawUnit=String(match[2]||'stuk').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''),term=match[3].replace(/^(en|plus)\s+/,'').replace(/[,.]+$/,'').trim();if(term&&Number.isFinite(amount)&&amount>0)items.push({amount,unit:rawUnit,term})}
+  while((match=rx.exec(cleaned))){const amount=amountNumber(match[1]),rawUnit=String(match[2]||'stuk').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''),term=match[3].replace(/^(en|plus)\s+/,'').replace(/\s+(met|en)$/,'').replace(/[,.]+$/,'').trim();if(term&&Number.isFinite(amount)&&amount>0)items.push({amount,unit:rawUnit,term})}
   return items;
 }
 function localFoodForTerm(raw){if(/\b\d+\s*%/.test(raw))return null;const term=normalizeFoodTerm(raw).trim(),alias=FOOD_ALIASES[term];return FOOD_DB.find(x=>x.id===alias)||FOOD_DB.find(x=>normalizeFoodTerm(x.name)===term)}
@@ -514,7 +519,7 @@ bindNav();
 if('serviceWorker'in navigator){
   let refreshing=false;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(!refreshing){refreshing=true;location.reload()}});
-  window.addEventListener('load',async()=>{try{const registration=await navigator.serviceWorker.register('./service-worker.js?v=13',{updateViaCache:'none'});await registration.update()}catch(error){console.warn('App-update kon niet worden gecontroleerd',error)}});
+  window.addEventListener('load',async()=>{try{const registration=await navigator.serviceWorker.register('./service-worker.js?v=14',{updateViaCache:'none'});await registration.update()}catch(error){console.warn('App-update kon niet worden gecontroleerd',error)}});
 }
 render();
 

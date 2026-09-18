@@ -21,13 +21,18 @@ const ingredients=JSON.parse(JSON.stringify(context.mealIngredientsFromText('ik 
 assert.deepEqual(ingredients.map(x=>[x.amount,x.term]),[[30,'havermout'],[30,'whey proteine'],[5,'85% donkere chocola']]);
 const varied=JSON.parse(JSON.stringify(context.mealIngredientsFromText('3 eieren, 2 sneetjes volkorenbrood en 30 g MyProtein Impact Whey Vanille')));
 assert.deepEqual(varied.map(x=>[x.amount,x.unit,x.term]),[[3,'stuk','eieren'],[2,'sneetjes','volkorenbrood'],[30,'g','myprotein impact whey vanille']]);
+const spokenMeal=JSON.parse(JSON.stringify(context.mealIngredientsFromText('ik heb twee handpalmen noten gegeten, 2 witte bollen met 15g pindakaas en 2 eieren')));
+assert.deepEqual(spokenMeal.map(x=>[x.amount,x.unit,x.term]),[[2,'handpalmen','noten'],[2,'stuk','witte bollen'],[15,'g','pindakaas'],[2,'stuk','eieren']]);
+const trainingContext={};vm.createContext(trainingContext);vm.runInContext(functionSource(training,'tParseWeek'),trainingContext);
+const parsedWeek=JSON.parse(JSON.stringify(trainingContext.tParseWeek('ik wil een trainingschema maken van 4 dagen waarvan ik maandag start met upper dinsdag lower woensdag rust donderdag upper en vrijdag lower met zaterdag zondag rust')));
+assert.deepEqual(parsedWeek.map(x=>[x.day,x.type]),[['Maandag','upper'],['Dinsdag','lower'],['Woensdag','rest'],['Donderdag','upper'],['Vrijdag','lower'],['Zaterdag','rest'],['Zondag','rest']]);
 assert.equal(context.reportDateFromText('Afname: 13-05-2026'),'2026-05-13');
 assert.equal(context.reportDateFromText('Rapport zonder datum'),'');
 
 assert.match(app,/Ontbijt.*Snack 1.*Lunch.*Snack 2.*Avondeten.*Snack 3/s);
 assert.match(app,/state\.photoEntries/);assert.match(app,/state\.skinfoldEntries/);assert.match(app,/checkInDate/);
 assert.match(app,/Goedenacht.*Goedemorgen.*Goedemiddag.*Goedenavond/s);
-assert.match(training,/trainingBuilder/);assert.match(training,/progressie/);assert.match(training,/regressie/);
+assert.match(training,/trainingBuilder/);assert.match(training,/progressie/);assert.match(training,/regressie/);assert.match(training,/Plate loaded/);assert.match(training,/volumeTarget/);
 assert.match(app,/Jouw uitslag in gewone taal/);assert.match(app,/Plan van aanpak/);
 assert.doesNotMatch(read('app/index.html'),/coachportaal/i);
 assert.match(read('coach/index.html'),/data-view="clients"/);assert.doesNotMatch(coach,/Sophie de Vries|Daan Jansen|Mila Bakker/);

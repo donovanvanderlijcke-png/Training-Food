@@ -42,4 +42,6 @@ node tests/smoke.mjs
 
 De controle test onder meer de zes eetmomenten, de voorbeeldzin voor voeding, rapportdatums, de gescheiden coachroute en de aanwezigheid van de cloudkoppeling.
 
-De voedingsinvoer ondersteunt ook aantallen, porties en merknamen, bijvoorbeeld `3 eieren`, `2 sneetjes volkorenbrood`, `1 scoop whey` en `30 g MyProtein Impact Whey`. Een gevonden product wordt altijd eerst ter controle getoond voordat de macro’s worden toegevoegd.
+De voedingsinvoer ondersteunt aantallen, porties en merknamen. Ook een volledige zin zoals `ik heb twee handpalmen noten gegeten, 2 witte bollen met 15g pindakaas en 2 eieren` wordt per product ontleed. Een handpalm noten staat standaard op 25 gram en een witte bol op 50 gram; de klant ziet die aanname altijd vóór het toevoegen.
+
+Als nog geen coachschema is toegewezen, kan de klant een complete trainingsweek beschrijven. De schema-builder begrijpt upper-, lower- en rustdagen, laat materiaal kiezen (dumbbells, barbells, plate loaded, pin loaded, kabels en lichaamsgewicht) en toont het berekende weekvolume voordat het schema onder **Mijn plan** wordt opgeslagen. Een later toegewezen coachschema heeft altijd voorrang.
